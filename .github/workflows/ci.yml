@@ -137,11 +137,12 @@ jobs:
           ssh -i ~/.ssh/deploy_key "${VM_USER}@${VM_IP}" '
             echo "Aguardando app inicializar..."
             for i in $(seq 1 10); do
-              if curl -sf http://localhost:3000/health > /dev/null 2>&1; then
+              STATUS=$(docker inspect --format="{{.State.Health.Status}}" chatbot_imobiliaria_app 2>/dev/null || echo "not_found")
+              if [ "$STATUS" = "healthy" ]; then
                 echo "✓ Deploy concluído com sucesso (tentativa ${i})"
                 exit 0
               fi
-              echo "  tentativa ${i}/10 — aguardando 10s..."
+              echo "  tentativa ${i}/10 — status: ${STATUS} — aguardando 10s..."
               sleep 10
             done
             echo "✗ Health check falhou após 100s. Logs do container:"
