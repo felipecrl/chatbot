@@ -1,371 +1,227 @@
-# 🏠 Chatbot WhatsApp para Imobiliárias
+# Chatbot WhatsApp para Imobiliárias
 
-Solução completa de automação com IA para WhatsApp. Integra **GPT-4** (conversas humanizadas), **SR Proprietário** (busca de imóveis), **IMOVIEW CRM** (gestão de leads) e **Meta Cloud API** (WhatsApp Business).
+Atendimento automatizado no WhatsApp com IA: entende o que o cliente procura, busca imóveis,
+descreve as opções e agenda visitas — registrando o lead no CRM. Integra **OpenAI (GPT-4)**,
+**Meta Cloud API (WhatsApp Business)**, **SR Proprietário** (catálogo de imóveis) e **IMOVIEW** (CRM).
 
-**Tecnologia:** Node.js + Express + PostgreSQL + OpenAI
+**Stack:** Node.js · TypeScript · Express · Prisma · PostgreSQL · OpenAI · Vitest
 
----
-
-## 📚 Guias Disponíveis
-
-- **[QUICKSTART.md](QUICKSTART.md)** ⚡ — 5 passos para começar em 2 minutos
-- **[DOCKER_SETUP.md](DOCKER_SETUP.md)** 🐳 — Guia detalhado: Docker, PostgreSQL, troubleshooting
-- **Este arquivo (README.md)** — Documentação completa do projeto
-
-👉 **Novo no projeto?** Comece pelo [QUICKSTART.md](QUICKSTART.md)
+> Este projeto começou como um MVP e foi refatorado para uma base profissional e escalável:
+> TypeScript em modo `strict`, arquitetura modular com injeção de dependências, validação de
+> configuração e payloads, camada de acesso a dados com Prisma, testes automatizados, lint/format
+> e CI.
 
 ---
 
-## 🚀 Início Rápido (3 minutos)
+## Sumário
 
-### 1. Validar ambiente
-```bash
-./test-setup.sh
-```
-
-### 2. Configurar variáveis
-```bash
-cp .env.example .env
-nano .env
-# Preencha: WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_VERIFY_TOKEN, OPENAI_API_KEY
-```
-
-### 3. Subir tudo
-```bash
-docker-compose up -d
-curl http://localhost:3000/health
-```
-
-✅ Pronto! Aplicação em `http://localhost:3000`
+- [Arquitetura](#arquitetura)
+- [Pré-requisitos](#pré-requisitos)
+- [Configuração](#configuração)
+- [Rodando localmente](#rodando-localmente)
+- [Rodando com Docker](#rodando-com-docker)
+- [Banco de dados / migrations](#banco-de-dados--migrations)
+- [Scripts disponíveis](#scripts-disponíveis)
+- [Testes, lint e build](#testes-lint-e-build)
+- [Variáveis de ambiente](#variáveis-de-ambiente)
+- [Endpoints HTTP](#endpoints-http)
+- [Deploy](#deploy)
+- [Documentação adicional](#documentação-adicional)
 
 ---
 
-## 📋 Pré-requisitos
+## Arquitetura
 
-### Com Docker (Recomendado)
-- Docker 20.10+
-- Docker Compose v2.0+ (ou `docker compose`)
+A aplicação segue uma arquitetura modular em camadas. Cada módulo de domínio expõe um
+_service_ (regras) e, quando há persistência, um _repository_ (acesso a dados via Prisma).
+As integrações externas ficam isoladas atrás de _services_ dedicados, o que torna o `ChatService`
+(orquestrador) testável com mocks.
 
-### Sem Docker (Desenvolvimento Local)
-- Node.js 20+
-- PostgreSQL 16+
+```
+src/
+├── index.ts                      # ponto de entrada
+├── server.ts                     # bootstrap HTTP + graceful shutdown + jobs
+├── container.ts                  # composition root (injeção de dependências)
+├── config/                       # carregamento e validação de env (zod) + config tipada
+├── lib/                          # logger (winston), erros (AppError), http client (axios)
+├── db/                           # PrismaClient singleton + health check
+├── http/                         # camada web
+│   ├── app.ts                    # fábrica do app Express (helmet, parsers, rotas)
+│   ├── middlewares/              # error handler, request logger, async handler, assinatura do webhook
+│   └── routes/                   # /health, /webhook
+├── modules/
+│   ├── ai/                       # OpenAI (tool calling) + mock + prompts + interface AiService
+│   ├── chat/                     # ChatService (orquestrador) + ferramentas expostas ao LLM
+│   ├── conversations/            # ConversationRepository (histórico, estado)
+│   ├── leads/                    # LeadRepository + LeadService (persistência + sync CRM)
+│   ├── crm/                      # CrmService (IMOVIEW)
+│   ├── properties/               # PropertyService (SR Proprietário) + catálogo de exemplo
+│   └── whatsapp/                 # WhatsAppService (envio), mapper (payload), verificação de assinatura
+└── types/                        # type augmentations
+prisma/
+├── schema.prisma                 # modelos Conversation e Lead
+└── migrations/                   # migrations versionadas
+```
+
+**Fluxo de uma mensagem:** Meta → `POST /webhook` (responde `200` na hora) → `ChatService`
+processa em background → `AiService.chat()` com as ferramentas (`buscar_imoveis`,
+`obter_detalhes_imovel`, `agendar_visita`, `transferir_para_humano`) → resposta enviada ao
+usuário via `WhatsAppService`. Sem `OPENAI_API_KEY` configurada, um `MockAiService` responde
+sem custo; sem `SR_PROPRIETARIO_*`, um catálogo de exemplo é usado; sem `IMOVIEW_*`, os leads
+ficam apenas no banco local.
 
 ---
 
-## 🐳 Desenvolvimento com Docker
+## Pré-requisitos
 
-### Configuração de variáveis
-
-Use o **único** arquivo `.env.example`:
-```bash
-cp .env.example .env
-```
-
-O arquivo já vem pronto com valores padrão e comentários explicativos.
-
-### Iniciar
-
-```bash
-# Subir PostgreSQL + Node.js em background
-docker-compose up -d
-
-# Ver logs em tempo real
-docker-compose logs -f app
-
-# Parar quando quiser
-docker-compose down
-```
-
-### Verificar Status
-
-```bash
-# Saúde da aplicação
-curl http://localhost:3000/health
-
-# Ver containers
-docker-compose ps
-
-# Conectar ao banco
-docker-compose exec postgres psql -U chatbot_user -d chatbot_imobiliaria
-```
-
-Para troubleshooting, veja [DOCKER_SETUP.md](DOCKER_SETUP.md).
+- **Node.js >= 20** (ver `.nvmrc` — recomendado Node 22)
+- **PostgreSQL 14+** (ou use o `docker-compose`)
+- Conta na **Meta for Developers** com um app WhatsApp Business (ver [docs/webhook-setup.md](docs/webhook-setup.md))
+- Opcional: chave de API da **OpenAI** (sem ela, o modo mock é ativado automaticamente)
 
 ---
 
-## 🛠️ Desenvolvimento Local (sem Docker)
-
-### 1. Instalar dependências
-
-```bash
-npm install
-```
-
-### 2. Configurar .env
+## Configuração
 
 ```bash
 cp .env.example .env
+# preencha pelo menos: DATABASE_URL, WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_VERIFY_TOKEN
+# (OPENAI_API_KEY é opcional — sem ela o chatbot roda em modo mock)
 ```
 
-Edite e ajuste a variável de banco:
-```env
-DATABASE_URL=postgresql://seu_usuario:sua_senha@localhost:5432/chatbot_imobiliaria
-```
+A configuração é validada na inicialização ([`src/config/env.ts`](src/config/env.ts)). Se faltar
+ou estiver inválida alguma variável obrigatória, o processo encerra com uma mensagem clara.
 
-### 3. Criar banco de dados
+---
+
+## Rodando localmente
 
 ```bash
-# Ubuntu/Debian
-createdb chatbot_imobiliaria
-
-# Ou manualmente
-psql
-CREATE DATABASE chatbot_imobiliaria;
+npm install                 # instala deps e gera o Prisma Client (postinstall)
+npm run db:deploy           # aplica as migrations no banco apontado por DATABASE_URL
+npm run dev                 # inicia em modo watch (tsx)
 ```
 
-### 4. Rodar migrations
+A API sobe em `http://localhost:3000`. Para expor o webhook em desenvolvimento, use um túnel
+(ex.: ngrok) — ver [docs/webhook-setup.md](docs/webhook-setup.md).
+
+Dicas para desenvolvimento sem custos / sem WhatsApp real:
+
+- `USE_MOCK_AI=true` — usa respostas simuladas em vez da OpenAI (padrão quando `OPENAI_API_KEY` está vazia)
+- `SKIP_WHATSAPP_SEND=true` — não envia mensagens ao WhatsApp, apenas registra nos logs
+
+---
+
+## Rodando com Docker
 
 ```bash
-npm run migrate
-```
-
-### 5. Iniciar servidor
-
-```bash
-npm run dev    # Desenvolvimento (com reload)
-npm start      # Produção
-```
-
-Acesse `http://localhost:3000`
-
----
-
-## 🔧 Configuração do WhatsApp Webhook
-
-Após ter a aplicação rodando, configure o webhook no Meta:
-
-1. Acesse [Meta for Developers](https://developers.facebook.com)
-2. Vá em **seu App > WhatsApp > Configuração > Webhook**
-3. Configure:
-   - **Callback URL**: `https://seu-dominio.com/webhook`
-   - **Verify Token**: mesmo valor de `WHATSAPP_VERIFY_TOKEN` em `.env`
-   - **Objetos Inscritos**: marque **messages**
-4. Salve
-
-Quando um cliente enviar mensagem no WhatsApp, será acionado o endpoint `POST /webhook`.
-
----
-
-## 📁 Estrutura do Projeto
-
-```
-whatsapp-chatbot-imobiliaria/
-├── src/
-│   ├── index.js                    # Entry point
-│   ├── config/
-│   │   └── index.js                # Configurações centralizadas
-│   ├── database/
-│   │   ├── connection.js           # Pool PostgreSQL
-│   │   └── migrations.js           # Cria tabelas
-│   ├── models/
-│   │   └── conversation.js         # Modelo de conversa
-│   ├── services/
-│   │   ├── whatsapp.js             # Meta Cloud API (envio)
-│   │   ├── openai.js               # GPT-4 com function calling
-│   │   ├── srProprietario.js       # API de busca de imóveis
-│   │   └── imoview.js              # API CRM (leads + agendamentos)
-│   ├── handlers/
-│   │   └── messageHandler.js       # Orquestra fluxo de mensagem
-│   ├── routes/
-│   │   ├── webhook.js              # GET/POST /webhook
-│   │   └── health.js               # GET /health
-│   └── utils/
-│       └── logger.js               # Winston (logs)
-├── docker-compose.yml              # PostgreSQL + Node.js
-├── Dockerfile                      # Imagem da aplicação
-├── package.json                    # Dependências
-├── .env.example                    # Template de variáveis
-├── QUICKSTART.md                   # Guia rápido
-├── DOCKER_SETUP.md                 # Guia detalhado Docker
-└── test-setup.sh                   # Script de validação
-```
-
----
-
-## 📊 Fluxo Completo de uma Mensagem
-
-```
-Cliente envia mensagem no WhatsApp
-         ↓
-Meta Cloud API → POST /webhook
-         ↓
-messageHandler.js extrai dados (telefone, texto)
-         ↓
-Busca/cria conversa no PostgreSQL
-         ↓
-Envia histórico de mensagens para GPT-4
-         ↓
-GPT-4 escolhe ação:
-  ├─ Resposta simples → sendText()
-  ├─ buscar_imoveis() → SR Proprietário API → sendMultiplosImoveis()
-  ├─ agendar_visita() → IMOVIEW CRM + lead no banco
-  └─ transferir_para_humano() → marca conversa como transferida
-         ↓
-Resposta volta ao cliente via WhatsApp
-         ↓
-Histórico salvo em PostgreSQL para contexto futuro
-```
-
----
-
-## 🔌 Integrações
-
-### 1️⃣ Meta Cloud API (WhatsApp)
-- **Função**: Receber e enviar mensagens
-- **Endpoint**: `POST /webhook`
-- **Variavelsobrigatórias**: `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_VERIFY_TOKEN`
-- **Status**: ✅ Implementado e pronto
-
-### 2️⃣ OpenAI GPT-4
-- **Função**: Conversas humanizadas com function calling
-- **Modelos**: gpt-4o (recomendado), gpt-4
-- **Ferramentas disponíveis**:
-  - `buscar_imoveis` — busca filtrada em SR Proprietário
-  - `obter_detalhes_imovel` — detalhes de um imóvel
-  - `agendar_visita` — cria lead + agendamento
-  - `transferir_para_humano` — marca para atendimento humano
-- **Variáveis obrigatórias**: `OPENAI_API_KEY`, `OPENAI_MODEL`
-- **Status**: ✅ Implementado
-
-### 3️⃣ SR Proprietário
-- **Função**: Buscar imóveis cadastrados
-- **Dados sincronizados**: código, tipo, preço, metragem, quartos, fotos, amenidades
-- **Variáveis**: `SR_PROPRIETARIO_API_URL`, `SR_PROPRIETARIO_API_KEY`
-- **Status**: ✅ Implementado com dados simulados se API não estiver configurada
-
-### 4️⃣ IMOVIEW CRM
-- **Função**: Registrar leads e agendamentos
-- **Dados enviados**: nome, telefone, email, imóvel, data/hora da visita
-- **Variáveis**: `IMOVIEW_API_URL`, `IMOVIEW_API_KEY`, `IMOVIEW_EMPRESA_ID`
-- **Status**: ✅ Implementado com fallback para banco local
-
----
-
-## 📦 Stack Tecnológico
-
-| Camada | Tecnologia | Motivo |
-|--------|-----------|--------|
-| **Mensageria** | Meta Cloud API | Principal canal dos clientes |
-| **IA** | OpenAI GPT-4o | Melhor custo/benefício, função calling |
-| **Backend** | Node.js + Express | Rápido, prático, JavaScript |
-| **Banco de Dados** | PostgreSQL | Robusto, suporta JSONB para histórico |
-| **Imóveis** | SR Proprietário API | Integração com sistema existente |
-| **CRM** | IMOVIEW API | Gestão de leads e agendamentos |
-| **Logs** | Winston | Estruturado, múltiplos transportes |
-
----
-
-## 📝 Logs
-
-Os logs estão disponíveis em:
-- **Console**: em tempo real durante execução
-- **Arquivo**: `logs/combined.log` (todos os eventos)
-- **Arquivo**: `logs/error.log` (apenas erros)
-
-```bash
-# Ver logs em tempo real (Docker)
-docker-compose logs -f app
-
-# Ver logs locais
-tail -f logs/combined.log
-```
-
----
-
-## 🚢 Deploy em Produção
-
-### Com Docker (Recomendado)
-
-```bash
-# 1. Build da imagem
-docker-compose build
-
-# 2. Push para registry (Docker Hub, AWS ECR, etc.)
-docker tag chatbot_imobiliaria_app seu-registry/chatbot:latest
-docker push seu-registry/chatbot:latest
-
-# 3. Pull e deploy em servidor
-docker-compose pull
-docker-compose up -d
-```
-
-### Checklist de Produção
-
-- [ ] `NODE_ENV=production` no `.env`
-- [ ] `WHATSAPP_ACCESS_TOKEN` com token real (não teste)
-- [ ] `OPENAI_API_KEY` com limite de custo configurado
-- [ ] `DATABASE_URL` apontando para DB em servidor seguro
-- [ ] HTTPS configurado (nginx com Let's Encrypt)
-- [ ] PostgreSQL com backups automáticos
-- [ ] Monitoramento de uptime (Healthchecks.io, Sentry, etc.)
-- [ ] Logs persistidos (ELK Stack, Datadog, etc.)
-
----
-
-## ✅ Validação e Testes
-
-### Script de validação
-```bash
-./test-setup.sh
-```
-
-### Health check
-```bash
+cp .env.example .env        # ajuste as variáveis (POSTGRES_*, WHATSAPP_*, OPENAI_API_KEY, ...)
+docker compose up -d --build
 curl http://localhost:3000/health
 ```
 
-Resposta esperada:
-```json
-{
-  "status": "healthy",
-  "timestamp": "2026-05-11T12:34:56.789Z",
-  "services": {
-    "database": "ok",
-    "whatsapp": "configured",
-    "openai": "configured",
-    "srProprietario": "configured",
-    "imoview": "configured"
-  }
-}
+O container do app aplica as migrations automaticamente (`prisma migrate deploy`) antes de subir.
+Detalhes e troubleshooting em [docs/docker-setup.md](docs/docker-setup.md).
+
+---
+
+## Banco de dados / migrations
+
+O schema vive em [`prisma/schema.prisma`](prisma/schema.prisma) (modelos `Conversation` e `Lead`).
+
+```bash
+npm run db:migrate          # cria/aplica uma migration em desenvolvimento (prisma migrate dev)
+npm run db:deploy           # aplica migrations pendentes (produção / CI)
+npm run db:generate         # regenera o Prisma Client
+npm run db:studio           # abre o Prisma Studio
 ```
 
 ---
 
-## 🆘 Troubleshooting
+## Scripts disponíveis
 
-Para problemas comuns, consulte [DOCKER_SETUP.md#-troubleshooting-comum](DOCKER_SETUP.md#-troubleshooting-comum).
-
-**Dúvidas frequentes:**
-
-**Q: Posso usar outra API de IA (Claude, Gemini, etc.)?**  
-A: Sim, adapte `src/services/openai.js` para usar outro SDK.
-
-**Q: Como integrar com WhatsApp Web sem Meta?**  
-A: Use Evolution API ou similar, adapte `src/services/whatsapp.js`.
-
-**Q: Qual é o custo mensal?**  
-A: Depende do volume. Estimativa: $100-$300 (OpenAI) + $10-$50 (WhatsApp) + infraestrutura.
+| Script                  | Descrição                                      |
+| ----------------------- | ---------------------------------------------- |
+| `npm run dev`           | Servidor em modo watch (`tsx watch`)           |
+| `npm run build`         | Compila TypeScript para `dist/`                |
+| `npm start`             | Roda a versão compilada (`node dist/index.js`) |
+| `npm run typecheck`     | `tsc --noEmit`                                 |
+| `npm run lint`          | ESLint                                         |
+| `npm run lint:fix`      | ESLint com correção automática                 |
+| `npm run format`        | Prettier (escreve)                             |
+| `npm test`              | Vitest (uma vez)                               |
+| `npm run test:watch`    | Vitest em watch                                |
+| `npm run test:coverage` | Vitest com cobertura                           |
+| `npm run db:*`          | Comandos do Prisma (ver acima)                 |
 
 ---
 
-## 📞 Links Úteis
+## Testes, lint e build
 
-- [Meta for Developers](https://developers.facebook.com) — Obter chaves WhatsApp
-- [OpenAI Platform](https://platform.openai.com) — Criar chave API GPT-4
-- [PostgreSQL Docs](https://www.postgresql.org/docs/) — Documentação do banco
-- [Node.js Docs](https://nodejs.org/docs/) — Documentação Node.js
+```bash
+npm run lint && npm run typecheck && npm run build && npm test
+```
 
-Para suporte das APIs:
-- **SR Proprietário**: Contate suporte deles
-- **IMOVIEW CRM**: Contate suporte deles
-- **Meta WhatsApp**: [developers.facebook.com/docs/whatsapp](https://developers.facebook.com/docs/whatsapp)
+Os testes são unitários (Vitest) com dependências mockadas — não precisam de banco nem de rede.
+O pipeline de CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) roda lint, checagem de
+formatação, type-check, build e testes em cada push/PR.
+
+---
+
+## Variáveis de ambiente
+
+Lista completa e comentada em [`.env.example`](.env.example). Resumo:
+
+| Variável                                              | Obrigatória | Padrão                             | Descrição                                                       |
+| ----------------------------------------------------- | ----------- | ---------------------------------- | --------------------------------------------------------------- |
+| `NODE_ENV`                                            | não         | `development`                      | `development` \| `test` \| `production`                         |
+| `PORT`                                                | não         | `3000`                             | Porta HTTP                                                      |
+| `LOG_LEVEL`                                           | não         | `debug` (dev) / `info` (prod)      | `error` \| `warn` \| `info` \| `http` \| `debug`                |
+| `DATABASE_URL`                                        | **sim**     | —                                  | URL de conexão do PostgreSQL                                    |
+| `WHATSAPP_ACCESS_TOKEN`                               | **sim**     | —                                  | Token da Meta Cloud API                                         |
+| `WHATSAPP_PHONE_NUMBER_ID`                            | **sim**     | —                                  | ID do número de WhatsApp Business                               |
+| `WHATSAPP_VERIFY_TOKEN`                               | **sim**     | —                                  | Token de verificação do webhook (você define)                   |
+| `WHATSAPP_API_VERSION`                                | não         | `v20.0`                            | Versão da Graph API                                             |
+| `WHATSAPP_APP_SECRET`                                 | não         | —                                  | Habilita a verificação da assinatura `X-Hub-Signature-256`      |
+| `OPENAI_API_KEY`                                      | não\*       | —                                  | Chave da OpenAI (\*obrigatória se `USE_MOCK_AI` não for `true`) |
+| `OPENAI_MODEL`                                        | não         | `gpt-4o`                           | Modelo do chat                                                  |
+| `USE_MOCK_AI`                                         | não         | `true` quando sem `OPENAI_API_KEY` | Usa respostas simuladas                                         |
+| `SR_PROPRIETARIO_API_URL` / `_API_KEY`                | não         | —                                  | Catálogo de imóveis (sem isso, usa catálogo de exemplo)         |
+| `IMOVIEW_API_URL` / `_API_KEY` / `IMOVIEW_EMPRESA_ID` | não         | —                                  | CRM (sem isso, leads ficam só no banco local)                   |
+| `SKIP_WHATSAPP_SEND`                                  | não         | `false`                            | Não envia mensagens ao WhatsApp (apenas loga)                   |
+| `EMPRESA_NOME` / `EMPRESA_CIDADE`                     | não         | `Imobiliária` / `Belo Horizonte`   | Usados nas respostas                                            |
+| `MAX_IMOVEIS_POR_RESPOSTA`                            | não         | `3`                                | Máximo de imóveis por resposta                                  |
+| `CONVERSA_TIMEOUT_MINUTOS`                            | não         | `60`                               | Inatividade antes de encerrar a conversa                        |
+| `CONVERSATION_CLEANUP_INTERVAL_MINUTES`               | não         | `60`                               | Frequência do job de limpeza                                    |
+
+---
+
+## Endpoints HTTP
+
+| Método | Rota       | Descrição                                                                                                                                                  |
+| ------ | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET`  | `/`        | Identificação do serviço                                                                                                                                   |
+| `GET`  | `/health`  | Health check (verifica o banco) — `200` saudável, `503` degradado                                                                                          |
+| `GET`  | `/webhook` | Handshake de verificação da Meta (`hub.challenge`)                                                                                                         |
+| `POST` | `/webhook` | Recebimento de mensagens (responde `200` imediatamente; processa em background; valida `X-Hub-Signature-256` se `WHATSAPP_APP_SECRET` estiver configurado) |
+
+---
+
+## Deploy
+
+A imagem Docker é multi-stage (build + runtime enxuto, usuário não-root, health check). Para
+produção atrás de um proxy com HTTPS automático (Caddy):
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
+
+Ajuste o domínio em [`Caddyfile`](Caddyfile) e configure o webhook na Meta apontando para
+`https://SEU_DOMINIO/webhook`.
+
+---
+
+## Documentação adicional
+
+- [docs/webhook-setup.md](docs/webhook-setup.md) — configuração do app na Meta e do webhook
+- [docs/docker-setup.md](docs/docker-setup.md) — Docker / PostgreSQL / troubleshooting

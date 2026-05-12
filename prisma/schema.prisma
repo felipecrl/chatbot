@@ -1,0 +1,60 @@
+// Prisma schema for the WhatsApp real-estate chatbot.
+// Docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ConversationState {
+  ACTIVE
+  TRANSFERRED
+  SCHEDULED
+  CLOSED
+}
+
+enum LeadStatus {
+  NEW
+  SCHEDULED
+  CONTACTED
+  LOST
+}
+
+model Conversation {
+  id               Int               @id @default(autoincrement())
+  phoneNumber      String            @unique @map("phone_number") @db.VarChar(20)
+  messages         Json              @default("[]")
+  state            ConversationState @default(ACTIVE)
+  clientName       String?           @map("client_name") @db.VarChar(255)
+  clientEmail      String?           @map("client_email") @db.VarChar(255)
+  viewedProperties Json              @default("[]") @map("viewed_properties")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+
+  @@index([state])
+  @@index([updatedAt])
+  @@map("conversations")
+}
+
+model Lead {
+  id                  Int        @id @default(autoincrement())
+  phoneNumber         String     @map("phone_number") @db.VarChar(20)
+  name                String?    @db.VarChar(255)
+  email               String?    @db.VarChar(255)
+  propertyCode        String?    @map("property_code") @db.VarChar(100)
+  propertyDescription String?    @map("property_description")
+  scheduledAt         DateTime?  @map("scheduled_at")
+  status              LeadStatus @default(NEW)
+  crmLeadId           String?    @map("crm_lead_id") @db.VarChar(100)
+  crmAppointmentId    String?    @map("crm_appointment_id") @db.VarChar(100)
+  createdAt           DateTime   @default(now()) @map("created_at")
+  updatedAt           DateTime   @updatedAt @map("updated_at")
+
+  @@index([phoneNumber])
+  @@index([status])
+  @@map("leads")
+}

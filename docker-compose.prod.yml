@@ -1,62 +1,29 @@
-version: '3.8'
+# Production overrides — use together with the base file:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Adds a Caddy reverse proxy (automatic HTTPS) in front of the app and stops
+# exposing PostgreSQL on the host.
 
 services:
   postgres:
-    image: postgres:16-alpine
-    container_name: chatbot_imobiliaria_db
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: chatbot_user
-      POSTGRES_PASSWORD: chatbot_secure_password_123
-      POSTGRES_DB: chatbot_imobiliaria
-      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U chatbot_user -d chatbot_imobiliaria"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - chatbot_network
+    ports: !reset []
 
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: chatbot_imobiliaria_app
-    restart: unless-stopped
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://chatbot_user:chatbot_secure_password_123@postgres:5432/chatbot_imobiliaria
-      PORT: 3000
-      WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN}
-      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID}
-      WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN}
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o}
-      SR_PROPRIETARIO_API_URL: ${SR_PROPRIETARIO_API_URL}
-      SR_PROPRIETARIO_API_KEY: ${SR_PROPRIETARIO_API_KEY}
-      IMOVIEW_API_URL: ${IMOVIEW_API_URL}
-      IMOVIEW_API_KEY: ${IMOVIEW_API_KEY}
-      IMOVIEW_EMPRESA_ID: ${IMOVIEW_EMPRESA_ID}
-      EMPRESA_NOME: ${EMPRESA_NOME:-Minha Imobiliária}
-      EMPRESA_CIDADE: ${EMPRESA_CIDADE:-Belo Horizonte}
-      USE_MOCK_GPT: "false"
-      SKIP_WHATSAPP_SEND: "false"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - chatbot_network
+      USE_MOCK_AI: 'false'
+      SKIP_WHATSAPP_SEND: 'false'
+    ports: !reset []
 
   caddy:
     image: caddy:2-alpine
     container_name: chatbot_caddy
     restart: unless-stopped
+    depends_on:
+      - app
     ports:
-      - "80:80"
-      - "443:443"
+      - '80:80'
+      - '443:443'
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile
       - caddy_data:/data
@@ -65,13 +32,7 @@ services:
       - chatbot_network
 
 volumes:
-  postgres_data:
-    driver: local
   caddy_data:
     driver: local
   caddy_config:
     driver: local
-
-networks:
-  chatbot_network:
-    driver: bridge

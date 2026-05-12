@@ -1,0 +1,16 @@
+node_modules
+dist
+coverage
+logs
+.git
+.gitignore
+.env
+.env.*
+*.md
+.github
+.editorconfig
+.eslintcache
+docker-compose*.yml
+Caddyfile
+.vscode
+.idea
