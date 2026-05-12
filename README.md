@@ -117,6 +117,7 @@ Dicas para desenvolvimento sem custos / sem WhatsApp real:
 Existem dois modos de uso com Docker Compose.
 
 **Desenvolvimento** — build local, banco exposto na porta 5432:
+
 ```bash
 cp .env.example .env   # defaults já seguros para dev (USE_MOCK_AI=true, SKIP_WHATSAPP_SEND=true)
 make dev-docker        # sobe postgres + app (build local)
@@ -125,11 +126,13 @@ curl http://localhost:3000/health
 ```
 
 Para reconstruir a imagem após alterar o código:
+
 ```bash
 make dev-build
 ```
 
 **Produção** — imagem pré-construída do ghcr.io, Caddy com HTTPS, banco sem exposição externa:
+
 ```bash
 make prod-up           # usa docker-compose.yml + docker-compose.prod.yml
 ```
@@ -156,23 +159,23 @@ npm run db:studio           # abre o Prisma Studio
 
 Execute `make help` para listar todos os atalhos disponíveis. Principais:
 
-| Makefile / npm script            | Descrição                                            |
-| -------------------------------- | ---------------------------------------------------- |
-| `make dev` / `npm run dev`       | Servidor em modo watch (`tsx watch`)                 |
-| `make dev-docker`                | Sobe stack completo em Docker (dev)                  |
-| `make dev-down`                  | Derruba containers de dev                            |
-| `make dev-logs`                  | Segue os logs do app em dev                          |
-| `make prod-up`                   | Sobe com overrides de produção                       |
-| `make prod-down`                 | Derruba containers de prod                           |
-| `make migrate` / `npm run db:migrate` | Cria e aplica migration (dev)                   |
-| `make studio` / `npm run db:studio`   | Abre o Prisma Studio                            |
-| `make test` / `npm test`         | Vitest (uma vez)                                     |
-| `make lint`                      | ESLint + verificação de formatação                   |
-| `make build` / `npm run build`   | Compila TypeScript para `dist/`                      |
-| `npm run compose:dev`            | Alias de `make dev-docker`                           |
-| `npm run compose:prod`           | Alias de `make prod-up`                              |
-| `npm run test:watch`             | Vitest em watch                                      |
-| `npm run test:coverage`          | Vitest com cobertura                                 |
+| Makefile / npm script                 | Descrição                            |
+| ------------------------------------- | ------------------------------------ |
+| `make dev` / `npm run dev`            | Servidor em modo watch (`tsx watch`) |
+| `make dev-docker`                     | Sobe stack completo em Docker (dev)  |
+| `make dev-down`                       | Derruba containers de dev            |
+| `make dev-logs`                       | Segue os logs do app em dev          |
+| `make prod-up`                        | Sobe com overrides de produção       |
+| `make prod-down`                      | Derruba containers de prod           |
+| `make migrate` / `npm run db:migrate` | Cria e aplica migration (dev)        |
+| `make studio` / `npm run db:studio`   | Abre o Prisma Studio                 |
+| `make test` / `npm test`              | Vitest (uma vez)                     |
+| `make lint`                           | ESLint + verificação de formatação   |
+| `make build` / `npm run build`        | Compila TypeScript para `dist/`      |
+| `npm run compose:dev`                 | Alias de `make dev-docker`           |
+| `npm run compose:prod`                | Alias de `make prod-up`              |
+| `npm run test:watch`                  | Vitest em watch                      |
+| `npm run test:coverage`               | Vitest com cobertura                 |
 
 ---
 
