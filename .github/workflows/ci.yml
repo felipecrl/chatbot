@@ -1,4 +1,4 @@
-name: CI
+name: CI / CD
 
 on:
   push:
@@ -10,7 +10,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # ── Integração contínua ──────────────────────────────────────────────────────
   build:
+    name: Lint · Type · Build · Test
     runs-on: ubuntu-latest
 
     steps:
@@ -38,3 +40,50 @@ jobs:
 
       - name: Test
         run: npm test
+
+  # ── Deploy na Oracle VM (só na branch main, após CI passar) ─────────────────
+  deploy:
+    name: Deploy → Oracle VM
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.ORACLE_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.ORACLE_VM_IP }}" >> ~/.ssh/known_hosts
+
+      - name: Sincronizar arquivos via rsync
+        run: |
+          rsync -az --delete \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='dist' \
+            --exclude='coverage' \
+            --exclude='.env' \
+            --exclude='logs' \
+            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
+            . "${{ secrets.ORACLE_VM_USER }}@${{ secrets.ORACLE_VM_IP }}:~/whatsapp-chatbot-imobiliaria/"
+
+      - name: Rebuildar e reiniciar containers
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=no \
+            "${{ secrets.ORACLE_VM_USER }}@${{ secrets.ORACLE_VM_IP }}" \
+            'cd ~/whatsapp-chatbot-imobiliaria && \
+             docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+               up -d --build --remove-orphans 2>&1 | tail -20'
+
+      - name: Verificar saúde da aplicação
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=no \
+            "${{ secrets.ORACLE_VM_USER }}@${{ secrets.ORACLE_VM_IP }}" \
+            'sleep 15 && \
+             curl -sf http://localhost:3000/health | python3 -m json.tool && \
+             echo "✓ Deploy bem-sucedido"'
