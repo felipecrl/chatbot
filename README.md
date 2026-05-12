@@ -114,13 +114,27 @@ Dicas para desenvolvimento sem custos / sem WhatsApp real:
 
 ## Rodando com Docker
 
+Existem dois modos de uso com Docker Compose.
+
+**Desenvolvimento** — build local, banco exposto na porta 5432:
 ```bash
-cp .env.example .env        # ajuste as variáveis (POSTGRES_*, WHATSAPP_*, OPENAI_API_KEY, ...)
-docker compose up -d --build
+cp .env.example .env   # defaults já seguros para dev (USE_MOCK_AI=true, SKIP_WHATSAPP_SEND=true)
+make dev-docker        # sobe postgres + app (build local)
+make dev-logs          # acompanha os logs
 curl http://localhost:3000/health
 ```
 
-O container do app aplica as migrations automaticamente (`prisma migrate deploy`) antes de subir.
+Para reconstruir a imagem após alterar o código:
+```bash
+make dev-build
+```
+
+**Produção** — imagem pré-construída do ghcr.io, Caddy com HTTPS, banco sem exposição externa:
+```bash
+make prod-up           # usa docker-compose.yml + docker-compose.prod.yml
+```
+
+O container aplica as migrations automaticamente (`prisma migrate deploy`) antes de subir.
 Detalhes e troubleshooting em [docs/docker-setup.md](docs/docker-setup.md).
 
 ---
@@ -140,19 +154,25 @@ npm run db:studio           # abre o Prisma Studio
 
 ## Scripts disponíveis
 
-| Script                  | Descrição                                      |
-| ----------------------- | ---------------------------------------------- |
-| `npm run dev`           | Servidor em modo watch (`tsx watch`)           |
-| `npm run build`         | Compila TypeScript para `dist/`                |
-| `npm start`             | Roda a versão compilada (`node dist/index.js`) |
-| `npm run typecheck`     | `tsc --noEmit`                                 |
-| `npm run lint`          | ESLint                                         |
-| `npm run lint:fix`      | ESLint com correção automática                 |
-| `npm run format`        | Prettier (escreve)                             |
-| `npm test`              | Vitest (uma vez)                               |
-| `npm run test:watch`    | Vitest em watch                                |
-| `npm run test:coverage` | Vitest com cobertura                           |
-| `npm run db:*`          | Comandos do Prisma (ver acima)                 |
+Execute `make help` para listar todos os atalhos disponíveis. Principais:
+
+| Makefile / npm script            | Descrição                                            |
+| -------------------------------- | ---------------------------------------------------- |
+| `make dev` / `npm run dev`       | Servidor em modo watch (`tsx watch`)                 |
+| `make dev-docker`                | Sobe stack completo em Docker (dev)                  |
+| `make dev-down`                  | Derruba containers de dev                            |
+| `make dev-logs`                  | Segue os logs do app em dev                          |
+| `make prod-up`                   | Sobe com overrides de produção                       |
+| `make prod-down`                 | Derruba containers de prod                           |
+| `make migrate` / `npm run db:migrate` | Cria e aplica migration (dev)                   |
+| `make studio` / `npm run db:studio`   | Abre o Prisma Studio                            |
+| `make test` / `npm test`         | Vitest (uma vez)                                     |
+| `make lint`                      | ESLint + verificação de formatação                   |
+| `make build` / `npm run build`   | Compila TypeScript para `dist/`                      |
+| `npm run compose:dev`            | Alias de `make dev-docker`                           |
+| `npm run compose:prod`           | Alias de `make prod-up`                              |
+| `npm run test:watch`             | Vitest em watch                                      |
+| `npm run test:coverage`          | Vitest com cobertura                                 |
 
 ---
 
@@ -209,11 +229,21 @@ Lista completa e comentada em [`.env.example`](.env.example). Resumo:
 
 ## Deploy
 
-A imagem Docker é multi-stage (build + runtime enxuto, usuário não-root, health check). Para
-produção atrás de um proxy com HTTPS automático (Caddy):
+O deploy em produção é feito automaticamente pelo pipeline de CI/CD
+([.github/workflows/ci.yml](.github/workflows/ci.yml)) a cada push na branch `main`:
+
+1. **build** — lint, type-check, build e testes
+2. **publish** — constrói imagem multi-arch (`linux/amd64` + `linux/arm64`) e publica no `ghcr.io`
+3. **deploy** — sincroniza arquivos via rsync, faz `docker compose pull` da nova imagem e reinicia
+   os containers na Oracle VM via SSH
+
+A imagem é multi-stage (build + runtime enxuto, usuário não-root, `HEALTHCHECK` nativo). O Caddy
+cuida do HTTPS automático.
+
+Para subir manualmente em produção (requer `DOCKER_IMAGE` configurado no `.env` da VM):
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+make prod-up
 ```
 
 Ajuste o domínio em [`Caddyfile`](Caddyfile) e configure o webhook na Meta apontando para

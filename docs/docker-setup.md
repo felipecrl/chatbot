@@ -1,252 +1,241 @@
-# 🐳 Guia Completo: PostgreSQL + Node.js com Docker no Linux
+# Docker — Guia de Uso
 
-Este guia mostra como subir o banco de dados PostgreSQL e a aplicação usando Docker Compose.
+Este guia cobre como subir e gerenciar os containers Docker para os dois ambientes do projeto.
 
-## ✅ Pré-requisitos
+---
 
-Verifique se tem instalado:
+## Pré-requisitos
 
 ```bash
-# Docker
-docker --version
-# Esperado: Docker version 20.10+
-
-# Docker Compose
-docker-compose --version
-# Esperado: Docker Compose version 2.0+
+docker --version          # Docker 20.10+
+docker compose version    # Docker Compose v2 (plugin, não docker-compose v1)
 ```
 
-Se não tiver, instale:
+Se não tiver instalado (Ubuntu/Debian):
 
 ```bash
-# Ubuntu/Debian
 sudo apt-get update
-sudo apt-get install docker.io docker-compose
+sudo apt-get install docker.io docker-compose-plugin
 sudo usermod -aG docker $USER
-# Logout e login novamente para ativar
-
-# Fedora/RHEL
-sudo dnf install docker docker-compose
-sudo usermod -aG docker $USER
+newgrp docker              # ativa o grupo sem precisar de logout
 ```
 
-## 🚀 Passo 1: Configurar Variáveis de Ambiente
+---
+
+## Ambientes
+
+| | Desenvolvimento | Produção |
+|---|---|---|
+| Comando | `make dev-docker` | `make prod-up` |
+| Imagem | build local (Dockerfile) | pré-construída via CI (ghcr.io) |
+| Banco | porta 5432 exposta no host | interno, sem exposição |
+| HTTPS | não | sim (Caddy automático) |
+| `NODE_ENV` | `development` | `production` |
+| `USE_MOCK_AI` | `true` (padrão) | `false` |
+| `SKIP_WHATSAPP_SEND` | `true` (padrão) | `false` |
+
+---
+
+## Desenvolvimento
+
+### 1. Configurar variáveis
 
 ```bash
-cd /home/felipecrl/Projetos/whatsapp-chatbot-imobiliaria
-
-# Copiar arquivo de exemplo
 cp .env.example .env
-
-# Editar com suas chaves (nano, vim, ou editor visual)
-nano .env
+# Os defaults do .env.example já são seguros para dev:
+#   USE_MOCK_AI=true        → sem custo de API
+#   SKIP_WHATSAPP_SEND=true → sem envio real ao WhatsApp
 ```
 
-Preencha os campos obrigatórios:
-
-```env
-WHATSAPP_ACCESS_TOKEN=sua_chave_aqui
-WHATSAPP_PHONE_NUMBER_ID=seu_phone_id
-WHATSAPP_VERIFY_TOKEN=escolha_uma_senha
-OPENAI_API_KEY=sua_chave_openai
-```
-
-## 🚀 Passo 2: Iniciar os Containers
+### 2. Subir os containers
 
 ```bash
-# Subir PostgreSQL + Node.js em background
-docker-compose up -d
+make dev-docker        # sobe postgres + app em background
+# ou: npm run compose:dev
+```
 
-# Ver status dos containers
-docker-compose ps
+### 3. Verificar status
+
+```bash
+docker compose ps
 ```
 
 Saída esperada:
 
 ```
-NAME                        STATUS              PORTS
-chatbot_imobiliaria_db      Up (healthy)        5432/tcp
-chatbot_imobiliaria_app     Up                  0.0.0.0:3000->3000/tcp
+NAME                     STATUS           PORTS
+chatbot_imobiliaria_db   Up (healthy)     0.0.0.0:5432->5432/tcp
+chatbot_imobiliaria_app  Up (healthy)     0.0.0.0:3000->3000/tcp
 ```
 
-## 📝 Passo 3: Acompanhar os Logs
+### 4. Verificar saúde
 
 ```bash
-# Ver logs da aplicação em tempo real
-docker-compose logs -f app
-
-# Ou só do banco de dados
-docker-compose logs -f postgres
-
-# Ver tudo
-docker-compose logs -f
-
-# Sair dos logs: Ctrl+C
-```
-
-Procure por mensagens como:
-
-```
-Servidor iniciado na porta 3000
-Conexão com PostgreSQL estabelecida com sucesso
-Todas as migrations executadas com sucesso
-```
-
-## ✔️ Passo 4: Verificar se Está Funcionando
-
-```bash
-# Teste o endpoint de saúde
 curl http://localhost:3000/health
-
-# Resposta esperada:
-# {"status":"healthy",...}
-
-# Se receber erro de conexão, aguarde alguns segundos e tente novamente
 ```
 
-## 📊 Conectar ao Banco Diretamente (opcional)
+### 5. Acompanhar logs
 
 ```bash
-# Acessar PostgreSQL dentro do container
-docker-compose exec postgres psql -U chatbot_user -d chatbot_imobiliaria
-
-# Dentro do psql, comandos úteis:
-\dt                 # listar tabelas
-SELECT * FROM conversations;  # ver conversas
-\q                  # sair
+make dev-logs          # segue os logs do app
+docker compose logs -f # todos os containers
 ```
 
-Ou usar um cliente visual (pgAdmin, DBeaver):
+### 6. Reconstruir após alterar código
 
 ```bash
-# Host: localhost
-# Port: 5432
-# User: chatbot_user
-# Password: chatbot_secure_password_123
-# Database: chatbot_imobiliaria
+make dev-build         # força rebuild da imagem e reinicia
 ```
 
-## 🛑 Parar a Aplicação
+### 7. Derrubar
 
 ```bash
-# Parar containers (dados persistem no volume)
-docker-compose down
-
-# Parar e APAGAR dados do banco
-docker-compose down -v
-
-# Remover tudo (containers, volumes, imagens)
-docker-compose down -v --rmi all
+make dev-down          # preserva os dados do banco
+docker compose down -v # destrói também o volume do banco
 ```
 
-## 🔄 Reiniciar após Alterações
+---
 
-Se você modificar código ou variáveis:
+## Produção (manual)
+
+O deploy em produção é feito automaticamente via CI/CD a cada push na `main`. Para subir
+manualmente na Oracle VM:
 
 ```bash
-# Recriar containers
-docker-compose down
-docker-compose up -d
-
-# Ou simplemente:
-docker-compose restart app
+# Na VM, certifique-se que o .env contém DOCKER_IMAGE=ghcr.io/USUARIO/REPO
+make prod-up           # usa docker-compose.yml + docker-compose.prod.yml
+# ou: npm run compose:prod
 ```
 
-## 🐛 Troubleshooting Comum
+Para acompanhar:
+
+```bash
+make prod-logs
+```
+
+Para derrubar:
+
+```bash
+make prod-down
+```
+
+---
+
+## Banco de dados
+
+### Conectar ao PostgreSQL dentro do container
+
+```bash
+make dev-db-shell
+# equivalente a: docker exec -it chatbot_imobiliaria_db psql -U chatbot_user -d chatbot_imobiliaria
+```
+
+Comandos psql úteis:
+
+```sql
+\dt                         -- listar tabelas
+SELECT * FROM conversations; -- ver conversas
+SELECT * FROM leads;         -- ver leads
+\q                           -- sair
+```
+
+### Migrations
+
+```bash
+make migrate               # cria e aplica nova migration (dev)
+# ou: npm run db:migrate
+
+npm run db:deploy          # aplica migrations pendentes sem interação (usado no container em prod)
+```
+
+O container em produção aplica `prisma migrate deploy` automaticamente na inicialização.
+
+### Prisma Studio
+
+```bash
+make studio                # abre interface web na porta 5555
+# ou: npm run db:studio
+```
+
+### Backup e restore
+
+```bash
+# Backup
+docker compose exec postgres pg_dump -U chatbot_user chatbot_imobiliaria > backup.sql
+
+# Restore
+cat backup.sql | docker compose exec -T postgres psql -U chatbot_user chatbot_imobiliaria
+```
+
+---
+
+## Troubleshooting
 
 ### "Cannot connect to Docker daemon"
 
 ```bash
-# Inicie o Docker
 sudo systemctl start docker
-# Ou no userland (sem sudo):
-docker --version
 ```
 
 ### "Permission denied while trying to connect to Docker daemon"
 
 ```bash
 sudo usermod -aG docker $USER
-# Logout e login, ou:
 newgrp docker
 ```
+
+### "Permission denied" ao parar container criado com sudo
+
+O container foi iniciado como root. Use `sudo docker compose down` desta vez. Nas próximas
+execuções, use sempre sem `sudo` após adicionar o usuário ao grupo `docker`.
 
 ### "Port 3000 already in use"
 
 ```bash
-# Ver qual processo usa a porta
-lsof -i :3000
-# Ou use outra porta no docker-compose.yml:
-# ports:
-#   - "3001:3000"
+lsof -i :3000             # ver qual processo usa a porta
 ```
+
+Ou altere a porta no `.env`: `PORT=3001`
 
 ### "PostgreSQL container not healthy"
 
 ```bash
-# Aguarde 10 segundos e verifique de novo
-docker-compose ps
-
-# Se persistir, ver logs
-docker-compose logs postgres
-
-# Reiniciar
-docker-compose restart postgres
+docker compose logs postgres
+docker compose restart postgres
 ```
 
-### "Cannot find .env file"
+### Container do app reiniciando em loop
 
 ```bash
-# Certifique-se que criou o arquivo no diretório correto
-ls -la /home/felipecrl/Projetos/whatsapp-chatbot-imobiliaria/.env
-# Deve existir. Se não:
-cp .env.docker .env
+docker compose logs app   # ver o erro na inicialização
 ```
 
-## 📈 Monitorar Performance
+Causas comuns: variável obrigatória ausente no `.env`, banco ainda não disponível (aguarde o
+healthcheck do postgres), erro de migration.
+
+### Health check falha em produção
+
+O health check em produção usa `docker inspect` (não depende de porta exposta):
 
 ```bash
-# Ver uso de CPU/memória dos containers
-docker stats
-
-# Exemplo:
-# CONTAINER    CPU %   MEM USAGE
-# chatbot_app  0.5%    120MiB / 1GiB
-# chatbot_db   2.1%    80MiB / 1GiB
+docker inspect --format='{{.State.Health.Status}}' chatbot_imobiliaria_app
+docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=50 app
 ```
 
-## 💾 Backup do Banco de Dados
+### P1000 — Authentication failed against database
+
+As credenciais do `.env` não coincidem com o volume do Postgres inicializado anteriormente.
+Recrie o volume:
 
 ```bash
-# Fazer dump do banco
-docker-compose exec postgres pg_dump -U chatbot_user chatbot_imobiliaria > backup.sql
-
-# Restaurar de um backup
-cat backup.sql | docker-compose exec -T postgres psql -U chatbot_user chatbot_imobiliaria
+docker compose down -v
+docker compose up -d
 ```
-
-## 🔐 Notas de Segurança
-
-⚠️ **Para produção:**
-
-- Mude a senha padrão em `docker-compose.yml`
-- Use variáveis de ambiente seguras (AWS Secrets Manager, HashiCorp Vault)
-- Não faça commit do `.env` real no Git (use `.env.example`)
-- Configure HTTPS no nginx/proxy reverso
-- Restricione acesso ao PostgreSQL (não exponha porta 5432)
-
-## ✨ Próximas Etapas
-
-1. **Configurar webhook no Meta**:
-   - URL: `https://seu-dominio.com/webhook`
-   - Token: mesmo de `WHATSAPP_VERIFY_TOKEN`
-
-2. **Testar com client real**: Envie mensagem no WhatsApp para seu número
-
-3. **Monitorar logs**: `docker-compose logs -f app`
-
-4. **Adicionar métricas** (opcional): Prometheus, Datadog, etc.
 
 ---
 
-**Dúvidas?** Verifique `README.md` ou `DOCKER_SETUP.md`.
+## Monitorar uso de recursos
+
+```bash
+docker stats
+```

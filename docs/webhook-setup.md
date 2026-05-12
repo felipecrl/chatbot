@@ -223,7 +223,8 @@ xxxx
 Execute:
 
 ```bash
-docker-compose logs app | grep -i webhook
+make dev-logs | grep -i webhook
+# ou: docker compose logs app | grep -i webhook
 ```
 
 Deve ver algo como:
@@ -245,7 +246,8 @@ Cliente: "Olá"
 **3. Acompanhe os logs:**
 
 ```bash
-docker-compose logs -f app
+make dev-logs
+# ou: docker compose logs -f app
 ```
 
 Deve ver:
@@ -290,8 +292,9 @@ Seu servidor não está rodando ou não é acessível do exterior
 curl https://seu-dominio.com/health
 
 # Se der erro, inicie:
-docker-compose up -d
-docker-compose logs -f app
+make dev-docker        # dev local
+make prod-up           # produção
+make dev-logs          # acompanhe os logs
 ```
 
 **Causa 3: Domínio não tem HTTPS**
@@ -319,10 +322,11 @@ Meta só aceita HTTPS, não HTTP
 
 ```bash
 # Verificar se está rodando
-docker-compose ps
+docker compose ps
 
 # Se não está, inicie:
-docker-compose up -d
+make dev-docker        # dev local
+make prod-up           # produção
 
 # Aguarde 10 segundos e tente novamente
 ```
@@ -343,7 +347,7 @@ nano .env
 # WHATSAPP_ACCESS_TOKEN=novo_token_aqui
 
 # 4. Salve e reinicie:
-docker-compose restart app
+docker compose restart app
 ```
 
 ---
@@ -365,7 +369,7 @@ grep OPENAI_API_KEY .env
 # https://platform.openai.com/api-keys
 
 # 4. Atualize .env e reinicie:
-docker-compose restart app
+docker compose restart app   # ou: make dev-docker
 ```
 
 ---
@@ -382,7 +386,7 @@ docker-compose restart app
 - [ ] Marquei o checkbox "messages"
 - [ ] Cliquei em Salvar
 - [ ] Meta mostrou mensagem de sucesso
-- [ ] Verifiquei logs: `docker-compose logs app`
+- [ ] Verifiquei logs: `make dev-logs`
 - [ ] Testei enviando mensagem no WhatsApp
 - [ ] Recebi resposta! ✅
 
