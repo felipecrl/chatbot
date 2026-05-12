@@ -9,6 +9,7 @@ services:
     ports: !reset []
 
   app:
+    image: ${DOCKER_IMAGE}
     environment:
       NODE_ENV: production
       USE_MOCK_AI: 'false'
