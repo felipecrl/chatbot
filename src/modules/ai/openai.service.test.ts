@@ -33,6 +33,7 @@ function assistant(
           content,
           tool_calls: toolCalls?.map((c) => ({
             id: c.id,
+            type: 'function' as const,
             function: { name: c.name, arguments: c.args },
           })),
         },

@@ -46,7 +46,10 @@ export class OpenAiService implements AiService {
       const assistantMessage = response.choices[0]?.message;
       if (!assistantMessage) break;
 
-      const toolCalls = assistantMessage.tool_calls ?? [];
+      const toolCalls = (assistantMessage.tool_calls ?? []).filter(
+        (tc): tc is OpenAI.Chat.Completions.ChatCompletionMessageFunctionToolCall =>
+          tc.type === 'function',
+      );
       if (toolCalls.length === 0) {
         return { text: assistantMessage.content, usage: toUsage(response.usage) };
       }
