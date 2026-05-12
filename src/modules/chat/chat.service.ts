@@ -13,6 +13,7 @@ import type { PropertyService } from '../properties/property.service';
 import type { WhatsAppService } from '../whatsapp/whatsapp.service';
 import type { IncomingMessage } from '../whatsapp/whatsapp.types';
 import { buildChatTools } from './chat.tools';
+import { buildOffTopicReply } from './topic-guard';
 
 const log = logger.child({ module: 'chat' });
 
@@ -53,6 +54,15 @@ export class ChatService {
       await this.deps.conversations.updateState(from, ConversationState.ACTIVE);
       if (contactName) {
         await this.deps.conversations.updateClientInfo(from, { name: contactName });
+      }
+    }
+
+    if (config.chatbot.topicGuardEnabled) {
+      const onTopic = await this.deps.ai.classify(text);
+      if (!onTopic) {
+        log.info('Mensagem fora do escopo imobiliário — recusando', { from });
+        await this.safeSend(from, buildOffTopicReply());
+        return;
       }
     }
 

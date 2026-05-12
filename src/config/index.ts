@@ -53,6 +53,7 @@ export const config = {
     conversationTimeoutMinutes: env.CONVERSA_TIMEOUT_MINUTOS,
     conversationCleanupIntervalMinutes: env.CONVERSATION_CLEANUP_INTERVAL_MINUTES,
     historyWindowSize: 20,
+    topicGuardEnabled: env.TOPIC_GUARD_ENABLED,
   },
 } as const;
 

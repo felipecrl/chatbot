@@ -7,6 +7,10 @@ const ZERO_USAGE = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
 
 /** Keyword-based fake assistant for local development without OpenAI costs. */
 export class MockAiService implements AiService {
+  async classify(_text: string): Promise<boolean> {
+    return Promise.resolve(true);
+  }
+
   async chat(request: ChatRequest): Promise<ChatResult> {
     const lastUserMessage = [...request.messages].reverse().find((m) => m.role === 'user');
     const text = (lastUserMessage?.content ?? '').toLowerCase();

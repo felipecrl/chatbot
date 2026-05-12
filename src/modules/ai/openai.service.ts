@@ -10,6 +10,12 @@ const MAX_TOOL_ITERATIONS = 5;
 const MAX_TOKENS = 1_000;
 const TEMPERATURE = 0.7;
 
+const CLASSIFIER_MODEL = 'gpt-4o-mini';
+const CLASSIFIER_SYSTEM = `Você é um classificador de mensagens para um chatbot de imobiliária.
+Determine se a mensagem é relacionada ao mercado imobiliário.
+Tópicos permitidos: busca de imóveis, preços, aluguel, compra, venda, visitas, financiamento, bairros, condomínios, características de imóveis, saudações e despedidas.
+Responda APENAS com "sim" (dentro do escopo) ou "nao" (fora do escopo).`;
+
 export interface OpenAiServiceOptions {
   client?: OpenAI;
   model?: string;
@@ -77,6 +83,26 @@ export class OpenAiService implements AiService {
 
     log.warn('Limite de iterações de ferramentas atingido', { max: MAX_TOOL_ITERATIONS });
     return { text: response.choices[0]?.message.content ?? null, usage: toUsage(response.usage) };
+  }
+
+  async classify(text: string): Promise<boolean> {
+    try {
+      const response = await this.client.chat.completions.create({
+        model: CLASSIFIER_MODEL,
+        messages: [
+          { role: 'system', content: CLASSIFIER_SYSTEM },
+          { role: 'user', content: text },
+        ],
+        max_tokens: 5,
+        temperature: 0,
+      });
+      const answer = response.choices[0]?.message.content?.trim().toLowerCase() ?? '';
+      if (!answer) return true; // resposta vazia → fail open
+      return answer.startsWith('sim');
+    } catch (error) {
+      log.warn('Falha ao classificar mensagem — permitindo por precaução', toErrorMeta(error));
+      return true;
+    }
   }
 
   private async runTool(

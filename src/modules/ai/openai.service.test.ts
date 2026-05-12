@@ -164,3 +164,25 @@ describe('OpenAiService.chat', () => {
     vi.unstubAllEnvs();
   });
 });
+
+describe('OpenAiService.classify', () => {
+  it('returns true when the model answers "sim"', async () => {
+    const create = vi.fn().mockResolvedValue(assistant('sim'));
+    expect(await service(create).classify('Quero um apartamento')).toBe(true);
+  });
+
+  it('returns false when the model answers "nao"', async () => {
+    const create = vi.fn().mockResolvedValue(assistant('nao'));
+    expect(await service(create).classify('Quem foi Getúlio Vargas?')).toBe(false);
+  });
+
+  it('returns true (fail open) when the API call throws', async () => {
+    const create = vi.fn().mockRejectedValue(new Error('network error'));
+    expect(await service(create).classify('qualquer coisa')).toBe(true);
+  });
+
+  it('returns true when the response has no choices', async () => {
+    const create = vi.fn().mockResolvedValue({ choices: [] });
+    expect(await service(create).classify('qualquer coisa')).toBe(true);
+  });
+});

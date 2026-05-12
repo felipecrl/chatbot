@@ -37,6 +37,7 @@ const envSchema = z
     // Behaviour toggles (mostly for local testing)
     USE_MOCK_AI: booleanFromString.optional(),
     SKIP_WHATSAPP_SEND: booleanFromString.default(false),
+    TOPIC_GUARD_ENABLED: booleanFromString.default(true),
 
     // Chatbot config
     EMPRESA_NOME: z.string().default('Imobiliária'),

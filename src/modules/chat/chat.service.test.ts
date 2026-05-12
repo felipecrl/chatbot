@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, afterEach } from 'vitest';
+import { config } from '../../config';
 import { ConversationState } from '../conversations/conversation.repository';
 import type { IncomingMessage } from '../whatsapp/whatsapp.types';
 import { ChatService, type ChatServiceDeps } from './chat.service';
@@ -34,9 +35,19 @@ function makeDeps(
       markAsRead: vi.fn().mockResolvedValue(undefined),
       sendText: vi.fn().mockResolvedValue(undefined),
     },
-    ai: { chat: vi.fn().mockResolvedValue({ text: 'Olá! Como posso ajudar?' }) },
+    ai: {
+      chat: vi.fn().mockResolvedValue({ text: 'Olá! Como posso ajudar?' }),
+      classify: vi.fn().mockResolvedValue(true),
+    },
   } as unknown as ChatServiceDeps;
 }
+
+function setTopicGuard(enabled: boolean) {
+  (config as unknown as { chatbot: { topicGuardEnabled: boolean } }).chatbot.topicGuardEnabled =
+    enabled;
+}
+
+afterEach(() => setTopicGuard(false));
 
 describe('ChatService.handleIncomingMessage', () => {
   it('ignores non-text messages', async () => {
@@ -111,6 +122,34 @@ describe('ChatService.handleIncomingMessage', () => {
     await new ChatService(deps).handleIncomingMessage(makeMessage());
     expect(deps.whatsapp.sendText).not.toHaveBeenCalled();
     expect(deps.conversations.appendMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it('blocks off-topic messages and does not call the main LLM', async () => {
+    setTopicGuard(true);
+    const deps = makeDeps();
+    (deps.ai.classify as ReturnType<typeof vi.fn>).mockResolvedValueOnce(false);
+    await new ChatService(deps).handleIncomingMessage(makeMessage({ text: 'Quem foi Pelé?' }));
+    expect(deps.ai.chat).not.toHaveBeenCalled();
+    expect(deps.conversations.appendMessage).not.toHaveBeenCalled();
+    expect(deps.whatsapp.sendText).toHaveBeenCalledOnce();
+    const reply = (deps.whatsapp.sendText as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] as string;
+    expect(reply).toMatch(/especializado em imóveis/i);
+  });
+
+  it('allows on-topic messages through when guard is enabled', async () => {
+    setTopicGuard(true);
+    const deps = makeDeps();
+    await new ChatService(deps).handleIncomingMessage(makeMessage());
+    expect(deps.ai.chat).toHaveBeenCalledOnce();
+  });
+
+  it('skips the guard when TOPIC_GUARD_ENABLED is false', async () => {
+    setTopicGuard(false);
+    const deps = makeDeps();
+    (deps.ai.classify as ReturnType<typeof vi.fn>).mockResolvedValueOnce(false);
+    await new ChatService(deps).handleIncomingMessage(makeMessage());
+    expect(deps.ai.classify).not.toHaveBeenCalled();
+    expect(deps.ai.chat).toHaveBeenCalledOnce();
   });
 
   it('logs token usage when present', async () => {
