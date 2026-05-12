@@ -137,7 +137,18 @@ jobs:
           VM_USER: ${{ secrets.ORACLE_VM_USER }}
           VM_IP: ${{ secrets.ORACLE_VM_IP }}
         run: |
-          ssh -i ~/.ssh/deploy_key "${VM_USER}@${VM_IP}" \
-            'sleep 20 && \
-             curl -sf http://localhost:3000/health | python3 -m json.tool && \
-             echo "✓ Deploy concluído com sucesso"'
+          ssh -i ~/.ssh/deploy_key "${VM_USER}@${VM_IP}" '
+            echo "Aguardando app inicializar..."
+            for i in $(seq 1 10); do
+              if curl -sf http://localhost:3000/health > /dev/null 2>&1; then
+                echo "✓ Deploy concluído com sucesso (tentativa ${i})"
+                exit 0
+              fi
+              echo "  tentativa ${i}/10 — aguardando 10s..."
+              sleep 10
+            done
+            echo "✗ Health check falhou após 100s. Logs do container:"
+            cd ~/whatsapp-chatbot-imobiliaria
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=50 app
+            exit 1
+          '
