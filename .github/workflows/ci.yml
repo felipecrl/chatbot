@@ -63,7 +63,7 @@ jobs:
           NAME=$(echo "ghcr.io/${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
           echo "name=${NAME}" >> "$GITHUB_OUTPUT"
 
-      - name: Configurar QEMU (cross-compile ARM64)
+      - name: Configurar QEMU (cross-compile multi-arch)
         uses: docker/setup-qemu-action@v3
 
       - name: Configurar Docker Buildx
@@ -76,11 +76,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build e push (linux/arm64)
+      - name: Build e push (linux/amd64 + linux/arm64)
         uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: linux/arm64
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: |
             ${{ steps.image.outputs.name }}:latest
