@@ -1,3 +1,8 @@
+# Ambiente de desenvolvimento (base).
+# Uso:
+#   Dev   → docker compose up -d           (ou: make dev-docker)
+#   Prod  → docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#                                           (ou: make prod-up)
 services:
   postgres:
     image: postgres:16-alpine
@@ -33,7 +38,7 @@ services:
     env_file:
       - .env
     environment:
-      NODE_ENV: ${NODE_ENV:-production}
+      NODE_ENV: ${NODE_ENV:-development}
       PORT: 3000
       DATABASE_URL: postgresql://${POSTGRES_USER:-chatbot_user}:${POSTGRES_PASSWORD:-chatbot_password}@postgres:5432/${POSTGRES_DB:-chatbot_imobiliaria}
     ports:

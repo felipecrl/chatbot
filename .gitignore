@@ -7,6 +7,8 @@ dist/
 # environment
 .env
 .env.local
+.env.dev
+.env.prod
 .env.*.local
 
 # logs
