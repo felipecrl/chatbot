@@ -15,9 +15,11 @@ const envSchema = z
     DATABASE_URL: z.string().url(),
 
     // WhatsApp / Meta Cloud API
-    WHATSAPP_ACCESS_TOKEN: z.string().min(1),
-    WHATSAPP_PHONE_NUMBER_ID: z.string().min(1),
-    WHATSAPP_VERIFY_TOKEN: z.string().min(1),
+    // Credentials are required only when SKIP_WHATSAPP_SEND=false (validated in superRefine).
+    // In local dev with SKIP_WHATSAPP_SEND=true, placeholder values are accepted.
+    WHATSAPP_ACCESS_TOKEN: z.string().default(''),
+    WHATSAPP_PHONE_NUMBER_ID: z.string().default(''),
+    WHATSAPP_VERIFY_TOKEN: z.string().default('local-dev'),
     WHATSAPP_API_VERSION: z.string().default('v20.0'),
     WHATSAPP_APP_SECRET: z.string().optional(),
 
@@ -25,11 +27,7 @@ const envSchema = z
     OPENAI_API_KEY: z.string().optional(),
     OPENAI_MODEL: z.string().default('gpt-4o'),
 
-    // SR Proprietário (property catalog)
-    SR_PROPRIETARIO_API_URL: z.string().url().optional(),
-    SR_PROPRIETARIO_API_KEY: z.string().optional(),
-
-    // IMOVIEW CRM
+    // IMOVIEW (catálogo de imóveis + CRM)
     IMOVIEW_API_URL: z.string().url().optional(),
     IMOVIEW_API_KEY: z.string().optional(),
     IMOVIEW_EMPRESA_ID: z.string().optional(),
@@ -57,6 +55,22 @@ const envSchema = z
         path: ['OPENAI_API_KEY'],
         message: 'OPENAI_API_KEY is required unless USE_MOCK_AI=true',
       });
+    }
+    if (!env.SKIP_WHATSAPP_SEND) {
+      if (!env.WHATSAPP_ACCESS_TOKEN) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['WHATSAPP_ACCESS_TOKEN'],
+          message: 'WHATSAPP_ACCESS_TOKEN is required unless SKIP_WHATSAPP_SEND=true',
+        });
+      }
+      if (!env.WHATSAPP_PHONE_NUMBER_ID) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['WHATSAPP_PHONE_NUMBER_ID'],
+          message: 'WHATSAPP_PHONE_NUMBER_ID is required unless SKIP_WHATSAPP_SEND=true',
+        });
+      }
     }
   });
 

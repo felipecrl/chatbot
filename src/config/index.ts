@@ -33,12 +33,6 @@ export const config = {
     useMock: env.USE_MOCK_AI,
   },
 
-  srProprietario: {
-    apiUrl: env.SR_PROPRIETARIO_API_URL,
-    apiKey: env.SR_PROPRIETARIO_API_KEY,
-    enabled: Boolean(env.SR_PROPRIETARIO_API_URL && env.SR_PROPRIETARIO_API_KEY),
-  },
-
   imoview: {
     apiUrl: env.IMOVIEW_API_URL,
     apiKey: env.IMOVIEW_API_KEY,

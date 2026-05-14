@@ -32,7 +32,6 @@ beforeEach(() => {
 
 afterEach(() => {
   (config as unknown as { openai: { useMock: boolean } }).openai.useMock = true;
-  (config as unknown as { srProprietario: { enabled: boolean } }).srProprietario.enabled = false;
   (config as unknown as { imoview: { enabled: boolean } }).imoview.enabled = false;
 });
 
@@ -54,7 +53,6 @@ describe('GET /health', () => {
       status: 'healthy',
       services: { database: 'ok', whatsapp: 'configured', openai: 'mock' },
     });
-    expect(res.body.services.srProprietario).toBe('not_configured');
     expect(res.body.services.imoview).toBe('not_configured');
   });
 
@@ -68,13 +66,11 @@ describe('GET /health', () => {
 
   it('reflects configured integrations', async () => {
     (config as unknown as { openai: { useMock: boolean } }).openai.useMock = false;
-    (config as unknown as { srProprietario: { enabled: boolean } }).srProprietario.enabled = true;
     (config as unknown as { imoview: { enabled: boolean } }).imoview.enabled = true;
     const { app } = makeApp();
     const res = await request(app).get('/health');
     expect(res.body.services).toMatchObject({
       openai: 'configured',
-      srProprietario: 'configured',
       imoview: 'configured',
     });
   });

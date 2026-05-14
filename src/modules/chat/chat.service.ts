@@ -40,7 +40,7 @@ export class ChatService {
       return;
     }
 
-    log.info('Mensagem recebida', { from, preview: text.slice(0, 80) });
+    log.info('Mensagem recebida', { from, text });
     await this.deps.whatsapp.markAsRead(messageId);
 
     const conversation = await this.deps.conversations.getOrCreate(from);
@@ -58,7 +58,8 @@ export class ChatService {
     }
 
     if (config.chatbot.topicGuardEnabled) {
-      const onTopic = await this.deps.ai.classify(text);
+      const recentHistory = this.toChatHistory(conversation).slice(-5);
+      const onTopic = await this.deps.ai.classify(text, recentHistory);
       if (!onTopic) {
         log.info('Mensagem fora do escopo imobiliário — recusando', { from });
         await this.safeSend(from, buildOffTopicReply());
@@ -80,6 +81,7 @@ export class ChatService {
 
       const reply = result.text?.trim();
       if (reply) {
+        log.info('Resposta gerada', { from, reply });
         await this.deps.conversations.appendMessage(from, 'assistant', reply);
         await this.deps.whatsapp.sendText(from, reply);
       }

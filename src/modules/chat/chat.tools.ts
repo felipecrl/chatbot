@@ -92,17 +92,70 @@ export function buildChatTools(deps: ChatToolsDeps, phoneNumber: string): ChatTo
 
         try {
           const properties = await deps.properties.search(filters);
-          if (properties.length === 0) {
-            return { mensagem: 'Nenhum imóvel encontrado com esses critérios.', imoveis: [] };
+
+          if (properties.length > 0) {
+            for (const p of properties) {
+              await deps.conversations.addViewedProperty(phoneNumber, p.code);
+            }
+            dispatchPropertyMedia(deps.whatsapp, phoneNumber, properties);
+            return { imoveis: properties.map(toPropertyDigest), total: properties.length };
           }
 
-          for (const property of properties) {
-            await deps.conversations.addViewedProperty(phoneNumber, property.code);
+          // No results — run a cascade of progressively relaxed searches.
+          const hasCharacteristics =
+            filters.minBedrooms != null ||
+            filters.minPrice != null ||
+            filters.maxPrice != null ||
+            filters.minArea != null ||
+            filters.type != null;
+
+          // Location-only filters (strip price / bedrooms / area / type).
+          const locationFilters: PropertySearchFilters = {
+            transaction: filters.transaction,
+            city: filters.city,
+            neighborhood: filters.neighborhood,
+          };
+
+          // Step 1: same location, relax characteristic filters.
+          if (hasCharacteristics) {
+            const similar = await deps.properties.search(locationFilters);
+            if (similar.length > 0) {
+              for (const p of similar) await deps.conversations.addViewedProperty(phoneNumber, p.code);
+              dispatchPropertyMedia(deps.whatsapp, phoneNumber, similar);
+              return {
+                sugestaoSimilar: true,
+                imoveis: similar.map(toPropertyDigest),
+                total: similar.length,
+              };
+            }
           }
 
-          dispatchPropertyMedia(deps.whatsapp, phoneNumber, properties);
+          // Step 2: city only (drop neighborhood), keeping characteristics removed.
+          if (filters.neighborhood && filters.city) {
+            const cityOnly = await deps.properties.search({
+              ...locationFilters,
+              neighborhood: undefined,
+            });
+            if (cityOnly.length > 0) {
+              for (const p of cityOnly) await deps.conversations.addViewedProperty(phoneNumber, p.code);
+              dispatchPropertyMedia(deps.whatsapp, phoneNumber, cityOnly);
+              return {
+                semResultadoNoBairro: true,
+                sugestaoSimilar: hasCharacteristics,
+                bairro: filters.neighborhood,
+                cidade: filters.city,
+                imoveis: cityOnly.map(toPropertyDigest),
+                total: cityOnly.length,
+              };
+            }
+          }
 
-          return { imoveis: properties.map(toPropertyDigest), total: properties.length };
+          return {
+            semResultado: true,
+            cidade: filters.city ?? null,
+            bairro: filters.neighborhood ?? null,
+            imoveis: [],
+          };
         } catch (error) {
           log.error('Falha na busca de imóveis', toErrorMeta(error));
           return { erro: 'Não foi possível buscar imóveis no momento.', imoveis: [] };

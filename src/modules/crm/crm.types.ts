@@ -7,10 +7,11 @@ export interface CrmLeadInput {
 }
 
 export interface CrmAppointmentInput {
-  crmLeadId: string;
+  name?: string | null;
+  phoneNumber?: string | null;
+  email?: string | null;
   propertyCode?: string | null;
   scheduledAt?: Date | null;
-  clientName?: string | null;
 }
 
 export interface CrmResult {

@@ -41,6 +41,10 @@ export interface ChatResult {
 
 export interface AiService {
   chat(request: ChatRequest): Promise<ChatResult>;
-  /** Returns true if the text is real-estate related; false if off-topic. Fails open on error. */
-  classify(text: string): Promise<boolean>;
+  /**
+   * Returns true if the text is real-estate related; false if off-topic. Fails open on error.
+   * Pass recent conversation context so ambiguous short replies ("não tenho preferências")
+   * are judged in context rather than in isolation.
+   */
+  classify(text: string, context?: ChatMessage[]): Promise<boolean>;
 }

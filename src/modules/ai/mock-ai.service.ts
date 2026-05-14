@@ -7,7 +7,7 @@ const ZERO_USAGE = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
 
 /** Keyword-based fake assistant for local development without OpenAI costs. */
 export class MockAiService implements AiService {
-  async classify(_text: string): Promise<boolean> {
+  async classify(_text: string, _context?: import('./ai.types').ChatMessage[]): Promise<boolean> {
     return Promise.resolve(true);
   }
 

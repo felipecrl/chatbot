@@ -2,7 +2,7 @@
 
 Atendimento automatizado no WhatsApp com IA: entende o que o cliente procura, busca imóveis,
 descreve as opções e agenda visitas — registrando o lead no CRM. Integra **OpenAI (GPT-4)**,
-**Meta Cloud API (WhatsApp Business)**, **SR Proprietário** (catálogo de imóveis) e **IMOVIEW** (CRM).
+**Meta Cloud API (WhatsApp Business)** e **IMOVIEW** (catálogo de imóveis + CRM).
 
 **Stack:** Node.js · TypeScript · Express · Prisma · PostgreSQL · OpenAI · Vitest
 
@@ -55,7 +55,7 @@ src/
 │   ├── conversations/            # ConversationRepository (histórico, estado)
 │   ├── leads/                    # LeadRepository + LeadService (persistência + sync CRM)
 │   ├── crm/                      # CrmService (IMOVIEW)
-│   ├── properties/               # PropertyService (SR Proprietário) + catálogo de exemplo
+│   ├── properties/               # PropertyService (Imoview) + catálogo de exemplo
 │   └── whatsapp/                 # WhatsAppService (envio), mapper (payload), verificação de assinatura
 └── types/                        # type augmentations
 prisma/
@@ -67,8 +67,7 @@ prisma/
 processa em background → `AiService.chat()` com as ferramentas (`buscar_imoveis`,
 `obter_detalhes_imovel`, `agendar_visita`, `transferir_para_humano`) → resposta enviada ao
 usuário via `WhatsAppService`. Sem `OPENAI_API_KEY` configurada, um `MockAiService` responde
-sem custo; sem `SR_PROPRIETARIO_*`, um catálogo de exemplo é usado; sem `IMOVIEW_*`, os leads
-ficam apenas no banco local.
+sem custo; sem `IMOVIEW_*`, um catálogo de exemplo é usado e os leads ficam apenas no banco local.
 
 ---
 
@@ -209,8 +208,7 @@ Lista completa e comentada em [`.env.example`](.env.example). Resumo:
 | `OPENAI_API_KEY`                                      | não\*       | —                                  | Chave da OpenAI (\*obrigatória se `USE_MOCK_AI` não for `true`) |
 | `OPENAI_MODEL`                                        | não         | `gpt-4o`                           | Modelo do chat                                                  |
 | `USE_MOCK_AI`                                         | não         | `true` quando sem `OPENAI_API_KEY` | Usa respostas simuladas                                         |
-| `SR_PROPRIETARIO_API_URL` / `_API_KEY`                | não         | —                                  | Catálogo de imóveis (sem isso, usa catálogo de exemplo)         |
-| `IMOVIEW_API_URL` / `_API_KEY` / `IMOVIEW_EMPRESA_ID` | não         | —                                  | CRM (sem isso, leads ficam só no banco local)                   |
+| `IMOVIEW_API_URL` / `_API_KEY` / `IMOVIEW_EMPRESA_ID` | não         | —                                  | Catálogo de imóveis + CRM (sem isso, usa catálogo de exemplo e leads ficam só no banco local) |
 | `SKIP_WHATSAPP_SEND`                                  | não         | `false`                            | Não envia mensagens ao WhatsApp (apenas loga)                   |
 | `EMPRESA_NOME` / `EMPRESA_CIDADE`                     | não         | `Imobiliária` / `Belo Horizonte`   | Usados nas respostas                                            |
 | `MAX_IMOVEIS_POR_RESPOSTA`                            | não         | `3`                                | Máximo de imóveis por resposta                                  |
