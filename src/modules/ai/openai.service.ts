@@ -2,7 +2,7 @@ import OpenAI from 'openai';
 import { config } from '../../config';
 import { logger } from '../../lib/logger';
 import { toErrorMeta } from '../../lib/errors';
-import type { AiService, ChatRequest, ChatResult, ChatTool, TokenUsage } from './ai.types';
+import type { AiService, ChatMessage, ChatRequest, ChatResult, ChatTool, TokenUsage } from './ai.types';
 
 const log = logger.child({ module: 'ai.openai' });
 
@@ -91,7 +91,7 @@ export class OpenAiService implements AiService {
     return { text: response.choices[0]?.message.content ?? null, usage: toUsage(response.usage) };
   }
 
-  async classify(text: string, context?: import('./ai.types').ChatMessage[]): Promise<boolean> {
+  async classify(text: string, context?: ChatMessage[]): Promise<boolean> {
     try {
       const contextPart =
         context && context.length > 0

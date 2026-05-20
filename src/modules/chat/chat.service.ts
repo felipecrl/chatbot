@@ -10,8 +10,7 @@ import {
 } from '../conversations/conversation.repository';
 import type { LeadService } from '../leads/lead.service';
 import type { PropertyService } from '../properties/property.service';
-import type { WhatsAppService } from '../whatsapp/whatsapp.service';
-import type { IncomingMessage } from '../whatsapp/whatsapp.types';
+import type { IWhatsAppService, IncomingMessage } from '../whatsapp/whatsapp.types';
 import { buildChatTools } from './chat.tools';
 import { buildOffTopicReply } from './topic-guard';
 
@@ -24,7 +23,7 @@ export interface ChatServiceDeps {
   conversations: ConversationRepository;
   properties: PropertyService;
   leads: LeadService;
-  whatsapp: WhatsAppService;
+  whatsapp: IWhatsAppService;
   ai: AiService;
 }
 

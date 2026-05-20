@@ -9,13 +9,15 @@ import { CrmService } from './modules/crm/crm.service';
 import { LeadRepository } from './modules/leads/lead.repository';
 import { LeadService } from './modules/leads/lead.service';
 import { PropertyService } from './modules/properties/property.service';
+import { UzapiWhatsAppService } from './modules/whatsapp/uazapi.service';
+import type { IWhatsAppService } from './modules/whatsapp/whatsapp.types';
 import { WhatsAppService } from './modules/whatsapp/whatsapp.service';
 
 export interface Container {
   conversations: ConversationRepository;
   leads: LeadService;
   properties: PropertyService;
-  whatsapp: WhatsAppService;
+  whatsapp: IWhatsAppService;
   crm: CrmService;
   ai: AiService;
   chat: ChatService;
@@ -28,7 +30,8 @@ export function createContainer(): Container {
   const crm = new CrmService();
   const leads = new LeadService(leadRepository, crm);
   const properties = new PropertyService();
-  const whatsapp = new WhatsAppService();
+  const whatsapp: IWhatsAppService =
+    config.whatsappProvider === 'uazapi' ? new UzapiWhatsAppService() : new WhatsAppService();
   const ai: AiService = config.openai.useMock ? new MockAiService() : new OpenAiService();
   const chat = new ChatService({ conversations, properties, leads, whatsapp, ai });
 

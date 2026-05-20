@@ -33,6 +33,7 @@ beforeEach(() => {
 afterEach(() => {
   (config as unknown as { openai: { useMock: boolean } }).openai.useMock = true;
   (config as unknown as { imoview: { enabled: boolean } }).imoview.enabled = false;
+  (config as unknown as { whatsappProvider: string }).whatsappProvider = 'uazapi';
 });
 
 describe('GET /', () => {
@@ -84,7 +85,11 @@ describe('GET /health', () => {
   });
 });
 
-describe('GET /webhook (verification handshake)', () => {
+describe('GET /webhook (verification handshake — Meta provider)', () => {
+  beforeEach(() => {
+    (config as unknown as { whatsappProvider: string }).whatsappProvider = 'meta';
+  });
+
   it('echoes the challenge when the token matches', async () => {
     const { app } = makeApp();
     const res = await request(app).get('/webhook').query({
@@ -105,7 +110,27 @@ describe('GET /webhook (verification handshake)', () => {
   });
 });
 
-describe('POST /webhook (inbound messages)', () => {
+describe('GET /webhook (uazapi provider — no handshake route)', () => {
+  beforeEach(() => {
+    (config as unknown as { whatsappProvider: string }).whatsappProvider = 'uazapi';
+  });
+
+  it('returns 404 (uazapi does not use GET handshake)', async () => {
+    const { app } = makeApp();
+    const res = await request(app).get('/webhook').query({
+      'hub.mode': 'subscribe',
+      'hub.verify_token': VERIFY_TOKEN,
+      'hub.challenge': '12345',
+    });
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('POST /webhook (inbound messages — Meta provider)', () => {
+  beforeEach(() => {
+    (config as unknown as { whatsappProvider: string }).whatsappProvider = 'meta';
+  });
+
   const messagePayload = {
     object: 'whatsapp_business_account',
     entry: [
@@ -164,6 +189,64 @@ describe('POST /webhook (inbound messages)', () => {
     expect(res.status).toBe(200);
     await new Promise((r) => setImmediate(r));
     expect(handleIncomingMessage).toHaveBeenCalledOnce();
+  });
+});
+
+describe('POST /webhook (inbound messages — uazapi provider)', () => {
+  beforeEach(() => {
+    (config as unknown as { whatsappProvider: string }).whatsappProvider = 'uazapi';
+  });
+
+  const uzapiPayload = {
+    EventType: 'messages',
+    instanceName: 'chatbot-dev',
+    message: {
+      messageid: 'msg-123',
+      chatid: '5531999999999@s.whatsapp.net',
+      sender_pn: '5531999999999@s.whatsapp.net',
+      text: 'Olá',
+      fromMe: false,
+      isGroup: false,
+      wasSentByApi: false,
+      messageTimestamp: 1700000000,
+      senderName: 'João',
+    },
+  };
+
+  it('acknowledges and dispatches the message to the chat service', async () => {
+    const { app, handleIncomingMessage } = makeApp();
+    const res = await request(app).post('/webhook').send(uzapiPayload);
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ status: 'received' });
+    await new Promise((r) => setImmediate(r));
+    expect(handleIncomingMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ from: '5531999999999', text: 'Olá' }),
+    );
+  });
+
+  it('ignores payloads with wrong EventType', async () => {
+    const { app, handleIncomingMessage } = makeApp();
+    await request(app).post('/webhook').send({ EventType: 'status' });
+    await new Promise((r) => setImmediate(r));
+    expect(handleIncomingMessage).not.toHaveBeenCalled();
+  });
+
+  it('ignores outgoing messages (fromMe=true)', async () => {
+    const { app, handleIncomingMessage } = makeApp();
+    await request(app)
+      .post('/webhook')
+      .send({ ...uzapiPayload, message: { ...uzapiPayload.message, fromMe: true } });
+    await new Promise((r) => setImmediate(r));
+    expect(handleIncomingMessage).not.toHaveBeenCalled();
+  });
+
+  it('ignores group messages', async () => {
+    const { app, handleIncomingMessage } = makeApp();
+    await request(app)
+      .post('/webhook')
+      .send({ ...uzapiPayload, message: { ...uzapiPayload.message, isGroup: true } });
+    await new Promise((r) => setImmediate(r));
+    expect(handleIncomingMessage).not.toHaveBeenCalled();
   });
 });
 
