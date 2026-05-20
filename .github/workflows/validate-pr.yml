@@ -1,0 +1,19 @@
+name: Validate PR
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - homolog
+      - main
+
+concurrency:
+  group: validate-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    # Executa docker-build apenas em PRs para homolog e main
+    uses: ./.github/workflows/reusable-ci.yml
+    with:
+      docker-build: ${{ github.base_ref == 'homolog' || github.base_ref == 'main' }}
