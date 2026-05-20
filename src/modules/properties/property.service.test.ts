@@ -57,7 +57,7 @@ describe('PropertyService — location code lookup', () => {
       textoPesquisa: 'Savassi',
     });
     const searchCall = post.mock.calls.find(
-      ([path]: [string]) => path === '/Imovel/RetornarImoveisDisponiveis',
+      ([path]: string[]) => path === '/Imovel/RetornarImoveisDisponiveis',
     );
     expect(searchCall?.[1]).toMatchObject({ codigosbairros: '42' });
     expect(searchCall?.[1]).not.toHaveProperty('codigocidade');
@@ -71,7 +71,7 @@ describe('PropertyService — location code lookup', () => {
       textoPesquisa: 'Belo Horizonte',
     });
     const searchCall = post.mock.calls.find(
-      ([path]: [string]) => path === '/Imovel/RetornarImoveisDisponiveis',
+      ([path]: string[]) => path === '/Imovel/RetornarImoveisDisponiveis',
     );
     expect(searchCall?.[1]).toMatchObject({ codigocidade: 10 });
   });
@@ -86,7 +86,7 @@ describe('PropertyService — location code lookup', () => {
       city: 'Belo Horizonte',
     });
     const searchCall = post.mock.calls.find(
-      ([path]: [string]) => path === '/Imovel/RetornarImoveisDisponiveis',
+      ([path]: string[]) => path === '/Imovel/RetornarImoveisDisponiveis',
     );
     expect(searchCall?.[1]).toMatchObject({ codigosbairros: '2' });
   });
@@ -98,7 +98,7 @@ describe('PropertyService — location code lookup', () => {
       city: 'Belo Horizonte',
     });
     const lookupCalls = post.mock.calls.filter(
-      ([path]: [string]) => path === '/Imovel/PesquisarCidadeEBairrosDisponiveis',
+      ([path]: string[]) => path === '/Imovel/PesquisarCidadeEBairrosDisponiveis',
     );
     // Only one lookup (neighborhood), no separate city lookup needed
     expect(lookupCalls).toHaveLength(1);
@@ -111,11 +111,11 @@ describe('PropertyService — location code lookup', () => {
       city: 'Belo Horizonte',
     });
     const lookupCalls = post.mock.calls.filter(
-      ([path]: [string]) => path === '/Imovel/PesquisarCidadeEBairrosDisponiveis',
+      ([path]: string[]) => path === '/Imovel/PesquisarCidadeEBairrosDisponiveis',
     );
     expect(lookupCalls).toHaveLength(2);
     const searchCall = post.mock.calls.find(
-      ([path]: [string]) => path === '/Imovel/RetornarImoveisDisponiveis',
+      ([path]: string[]) => path === '/Imovel/RetornarImoveisDisponiveis',
     );
     expect(searchCall?.[1]).toMatchObject({ codigocidade: 10 });
     expect(searchCall?.[1]).not.toHaveProperty('codigosbairros');
@@ -125,7 +125,7 @@ describe('PropertyService — location code lookup', () => {
     const post = vi.fn().mockResolvedValue({ data: { lista: [] } });
     await new PropertyService(clientWith(post)).search({ city: 'BH', neighborhood: 'SC' });
     const lookupCalls = post.mock.calls.filter(
-      ([path]: [string]) => path === '/Imovel/PesquisarCidadeEBairrosDisponiveis',
+      ([path]: string[]) => path === '/Imovel/PesquisarCidadeEBairrosDisponiveis',
     );
     expect(lookupCalls).toHaveLength(0);
   });
@@ -141,7 +141,7 @@ describe('PropertyService — location code lookup', () => {
       new PropertyService(clientWith(post)).search({ neighborhood: 'Savassi' }),
     ).resolves.toEqual([]);
     const searchCall = post.mock.calls.find(
-      ([path]: [string]) => path === '/Imovel/RetornarImoveisDisponiveis',
+      ([path]: string[]) => path === '/Imovel/RetornarImoveisDisponiveis',
     );
     expect(searchCall?.[1]).not.toHaveProperty('codigosbairros');
     expect(searchCall?.[1]).not.toHaveProperty('codigocidade');
@@ -151,7 +151,7 @@ describe('PropertyService — location code lookup', () => {
     const post = vi.fn().mockResolvedValue({ data: { lista: [] } });
     await new PropertyService(clientWith(post)).search({ transaction: 'venda' });
     const lookupCalls = post.mock.calls.filter(
-      ([path]: [string]) => path === '/Imovel/PesquisarCidadeEBairrosDisponiveis',
+      ([path]: string[]) => path === '/Imovel/PesquisarCidadeEBairrosDisponiveis',
     );
     expect(lookupCalls).toHaveLength(0);
   });
@@ -160,7 +160,7 @@ describe('PropertyService — location code lookup', () => {
     const post = searchPost([{ codigo: 99, nome: 'Lourdes', cidade: 'Belo Horizonte' }]);
     await new PropertyService(clientWith(post)).search({ neighborhood: 'lourdes' });
     const searchCall = post.mock.calls.find(
-      ([path]: [string]) => path === '/Imovel/RetornarImoveisDisponiveis',
+      ([path]: string[]) => path === '/Imovel/RetornarImoveisDisponiveis',
     );
     expect(searchCall?.[1]).toMatchObject({ codigosbairros: '99' });
   });
@@ -171,7 +171,7 @@ describe('PropertyService — location code lookup', () => {
     const results = await new PropertyService(clientWith(post)).search({ city: 'São Paulo' });
     expect(results).toEqual([]);
     const mainSearch = post.mock.calls.find(
-      ([path]: [string]) => path === '/Imovel/RetornarImoveisDisponiveis',
+      ([path]: string[]) => path === '/Imovel/RetornarImoveisDisponiveis',
     );
     expect(mainSearch).toBeUndefined();
   });
@@ -186,7 +186,7 @@ describe('PropertyService — location code lookup', () => {
     const results = await new PropertyService(clientWith(post)).search({ city: 'São Paulo' });
     expect(results).toEqual([]);
     const mainSearch = post.mock.calls.find(
-      ([path]: [string]) => path === '/Imovel/RetornarImoveisDisponiveis',
+      ([path]: string[]) => path === '/Imovel/RetornarImoveisDisponiveis',
     );
     // Fail open: main search still runs without city filter
     expect(mainSearch).toBeDefined();
