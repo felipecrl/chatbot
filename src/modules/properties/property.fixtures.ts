@@ -1,7 +1,7 @@
 import { config } from '../../config';
 import type { Property, PropertySearchFilters } from './property.types';
 
-/** Sample catalogue used when the SR Proprietário integration is not configured. */
+/** Sample catalogue used when the Imoview integration is not configured. */
 function sampleProperties(): Property[] {
   const city = config.chatbot.companyCity;
   return [
@@ -56,11 +56,23 @@ function sampleProperties(): Property[] {
   ];
 }
 
+function normalizeText(text: string): string {
+  return text.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
 export function searchSampleProperties(filters: PropertySearchFilters, limit: number): Property[] {
   return sampleProperties()
     .filter((p) => !filters.transaction || p.transaction === filters.transaction)
     .filter(
       (p) => !filters.type || (p.type ?? '').toLowerCase().includes(filters.type.toLowerCase()),
+    )
+    .filter(
+      (p) => !filters.city || normalizeText(p.city ?? '').includes(normalizeText(filters.city)),
+    )
+    .filter(
+      (p) =>
+        !filters.neighborhood ||
+        normalizeText(p.neighborhood ?? '').includes(normalizeText(filters.neighborhood)),
     )
     .filter((p) => filters.maxPrice == null || (p.price ?? 0) <= filters.maxPrice)
     .filter((p) => filters.minPrice == null || (p.price ?? 0) >= filters.minPrice)

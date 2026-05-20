@@ -14,7 +14,9 @@ export class LeadService {
 
   /**
    * Persists the lead/appointment locally first (source of truth) and then
-   * best-effort syncs it to the CRM. CRM failures are logged but never thrown.
+   * best-effort syncs it to Imoview via a single IncluirAgendamentoVisita call,
+   * which creates both the lead and the appointment in the CRM atomically.
+   * CRM failures are logged but never thrown.
    */
   async scheduleVisit(input: ScheduleVisitInput): Promise<ScheduleVisitResult> {
     const lead = await this.repository.create(
@@ -29,36 +31,25 @@ export class LeadService {
       LeadStatus.SCHEDULED,
     );
 
-    const crmLead = await this.crm.createLead({
+    const appointment = await this.crm.createAppointment({
       name: input.name,
       phoneNumber: input.phoneNumber,
       email: input.email,
       propertyCode: input.propertyCode,
+      scheduledAt: input.scheduledAt,
     });
 
-    let crmAppointmentId: string | null = null;
-    if (crmLead.id) {
-      const appointment = await this.crm.createAppointment({
-        crmLeadId: crmLead.id,
-        propertyCode: input.propertyCode,
-        scheduledAt: input.scheduledAt,
-        clientName: input.name,
-      });
-      crmAppointmentId = appointment.id;
-    }
-
-    if (crmLead.id || crmAppointmentId) {
-      await this.repository.setCrmIds(lead.id, crmLead.id, crmAppointmentId);
+    if (appointment.id) {
+      await this.repository.setCrmIds(lead.id, null, appointment.id);
     }
 
     log.info('Visita registrada', {
       leadId: lead.id,
-      crmLeadId: crmLead.id,
-      crmAppointmentId,
+      crmAppointmentId: appointment.id,
       phoneNumber: input.phoneNumber,
       propertyCode: input.propertyCode,
     });
 
-    return { leadId: lead.id, crmLeadId: crmLead.id, crmAppointmentId };
+    return { leadId: lead.id, crmLeadId: null, crmAppointmentId: appointment.id };
   }
 }

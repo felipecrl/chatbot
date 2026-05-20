@@ -185,4 +185,43 @@ describe('OpenAiService.classify', () => {
     const create = vi.fn().mockResolvedValue({ choices: [] });
     expect(await service(create).classify('qualquer coisa')).toBe(true);
   });
+
+  it('sends the user text and a system prompt that allows any city', async () => {
+    const create = vi.fn().mockResolvedValue(assistant('sim'));
+    await service(create).classify('tem apartamentos em São Paulo?');
+    const args = create.mock.calls[0]?.[0] as {
+      messages: Array<{ role: string; content: string }>;
+    };
+    const systemMsg = args.messages.find((m) => m.role === 'system');
+    const userMsg = args.messages.find((m) => m.role === 'user');
+    expect(userMsg?.content).toContain('tem apartamentos em São Paulo?');
+    // Prompt must cover city/location searches so queries like "em São Paulo?" are not rejected
+    expect(systemMsg?.content).toMatch(/qualquer cidade/i);
+  });
+
+  it('includes conversation context in the user message when provided', async () => {
+    const create = vi.fn().mockResolvedValue(assistant('sim'));
+    const context = [
+      { role: 'user' as const, content: 'Quero um apartamento em São Paulo' },
+      { role: 'assistant' as const, content: 'Qual bairro você prefere?' },
+    ];
+    await service(create).classify('não tenho preferências', context);
+    const args = create.mock.calls[0]?.[0] as {
+      messages: Array<{ role: string; content: string }>;
+    };
+    const userMsg = args.messages.find((m) => m.role === 'user');
+    expect(userMsg?.content).toContain('Contexto da conversa');
+    expect(userMsg?.content).toContain('não tenho preferências');
+    expect(userMsg?.content).toContain('Quero um apartamento em São Paulo');
+  });
+
+  it('sends plain text without context block when no context is given', async () => {
+    const create = vi.fn().mockResolvedValue(assistant('sim'));
+    await service(create).classify('quero comprar um imóvel');
+    const args = create.mock.calls[0]?.[0] as {
+      messages: Array<{ role: string; content: string }>;
+    };
+    const userMsg = args.messages.find((m) => m.role === 'user');
+    expect(userMsg?.content).toBe('quero comprar um imóvel');
+  });
 });

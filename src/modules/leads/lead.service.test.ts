@@ -11,7 +11,6 @@ function makeDeps() {
     setCrmIds: vi.fn().mockResolvedValue(undefined),
   };
   const crm = {
-    createLead: vi.fn().mockResolvedValue({ id: null }),
     createAppointment: vi.fn().mockResolvedValue({ id: null }),
   };
   const service = new LeadService(
@@ -51,37 +50,45 @@ describe('LeadService.scheduleVisit', () => {
     );
   });
 
-  it('does not create a CRM appointment when the CRM lead was not created', async () => {
-    const { service, crm, repository } = makeDeps();
+  it('always calls createAppointment (single-step lead+visit in Imoview)', async () => {
+    const { service, crm } = makeDeps();
+    await service.scheduleVisit(baseInput);
+    expect(crm.createAppointment).toHaveBeenCalledWith({
+      name: 'Maria Silva',
+      phoneNumber: '5531999999999',
+      email: 'maria@example.com',
+      propertyCode: 'AP001',
+      scheduledAt: undefined,
+    });
+  });
+
+  it('returns { crmLeadId: null } since Imoview does not return a lead id', async () => {
+    const { service } = makeDeps();
     const result = await service.scheduleVisit(baseInput);
-    expect(crm.createAppointment).not.toHaveBeenCalled();
-    expect(repository.setCrmIds).not.toHaveBeenCalled();
     expect(result).toEqual({ leadId: 42, crmLeadId: null, crmAppointmentId: null });
   });
 
-  it('creates an appointment and stores the CRM ids when the CRM lead is created', async () => {
+  it('stores the appointment id and returns it when Imoview responds with one', async () => {
     const { service, crm, repository } = makeDeps();
-    crm.createLead.mockResolvedValue({ id: 'crm-lead-1' });
     crm.createAppointment.mockResolvedValue({ id: 'crm-appt-1' });
     const scheduledAt = new Date('2026-06-20T18:00:00Z');
     const result = await service.scheduleVisit({ ...baseInput, scheduledAt });
 
     expect(crm.createAppointment).toHaveBeenCalledWith({
-      crmLeadId: 'crm-lead-1',
+      name: 'Maria Silva',
+      phoneNumber: '5531999999999',
+      email: 'maria@example.com',
       propertyCode: 'AP001',
       scheduledAt,
-      clientName: 'Maria Silva',
     });
-    expect(repository.setCrmIds).toHaveBeenCalledWith(42, 'crm-lead-1', 'crm-appt-1');
-    expect(result).toEqual({ leadId: 42, crmLeadId: 'crm-lead-1', crmAppointmentId: 'crm-appt-1' });
+    expect(repository.setCrmIds).toHaveBeenCalledWith(42, null, 'crm-appt-1');
+    expect(result).toEqual({ leadId: 42, crmLeadId: null, crmAppointmentId: 'crm-appt-1' });
   });
 
-  it('stores the CRM lead id even when the appointment fails', async () => {
+  it('does not call setCrmIds when Imoview returns no appointment id', async () => {
     const { service, crm, repository } = makeDeps();
-    crm.createLead.mockResolvedValue({ id: 'crm-lead-1' });
     crm.createAppointment.mockResolvedValue({ id: null });
-    const result = await service.scheduleVisit(baseInput);
-    expect(repository.setCrmIds).toHaveBeenCalledWith(42, 'crm-lead-1', null);
-    expect(result.crmAppointmentId).toBeNull();
+    await service.scheduleVisit(baseInput);
+    expect(repository.setCrmIds).not.toHaveBeenCalled();
   });
 });

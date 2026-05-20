@@ -1,3 +1,5 @@
+import type { Property } from '../properties/property.types';
+
 export type IncomingMessageType =
   | 'text'
   | 'image'
@@ -14,6 +16,14 @@ export interface IncomingMessage {
   type: IncomingMessageType;
   text: string;
   contactName: string;
+}
+
+export interface IWhatsAppService {
+  sendText(to: string, body: string): Promise<void>;
+  sendImage(to: string, imageUrl: string, caption?: string): Promise<void>;
+  sendProperty(to: string, property: Property): Promise<void>;
+  sendProperties(to: string, properties: Property[]): Promise<void>;
+  markAsRead(messageId: string): Promise<void>;
 }
 
 /** Minimal shape of the Meta Cloud API webhook payload that we rely on. */

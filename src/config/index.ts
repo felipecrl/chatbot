@@ -17,6 +17,8 @@ export const config = {
     url: env.DATABASE_URL,
   },
 
+  whatsappProvider: env.WHATSAPP_PROVIDER,
+
   whatsapp: {
     accessToken: env.WHATSAPP_ACCESS_TOKEN,
     phoneNumberId: env.WHATSAPP_PHONE_NUMBER_ID,
@@ -27,16 +29,15 @@ export const config = {
     skipSend: env.SKIP_WHATSAPP_SEND,
   },
 
+  uazapi: {
+    baseUrl: env.UAZAPI_BASE_URL ?? 'https://free.uazapi.com',
+    instanceToken: env.UAZAPI_INSTANCE_TOKEN ?? '',
+  },
+
   openai: {
     apiKey: env.OPENAI_API_KEY,
     model: env.OPENAI_MODEL,
     useMock: env.USE_MOCK_AI,
-  },
-
-  srProprietario: {
-    apiUrl: env.SR_PROPRIETARIO_API_URL,
-    apiKey: env.SR_PROPRIETARIO_API_KEY,
-    enabled: Boolean(env.SR_PROPRIETARIO_API_URL && env.SR_PROPRIETARIO_API_KEY),
   },
 
   imoview: {
