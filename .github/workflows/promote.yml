@@ -1,0 +1,163 @@
+name: Promote
+
+on:
+  push:
+    branches:
+      - develop
+      - homolog
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+
+permissions:
+  pull-requests: write
+  contents: write
+
+jobs:
+  # ── develop → homolog ──────────────────────────────────────────────────────
+  promote-to-homolog:
+    name: Promover develop → homolog
+    if: github.event_name == 'push' && github.ref_name == 'develop'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Resolver commits novos
+        id: commits
+        run: |
+          SHA=$(git rev-parse --short HEAD)
+          echo "sha=${SHA}" >> "$GITHUB_OUTPUT"
+          COMMITS=$(git log origin/homolog..HEAD --pretty='- %s (%h)' 2>/dev/null || echo '- (historico indisponivel)')
+          echo "list<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$COMMITS"  >> "$GITHUB_OUTPUT"
+          echo "EOF"        >> "$GITHUB_OUTPUT"
+
+      - name: Criar ou atualizar PR develop → homolog
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          SHA="${{ steps.commits.outputs.sha }}"
+          TITLE="chore: promote develop -> homolog (${SHA})"
+          {
+            echo "## Promocao automatica: \`develop\` -> \`homolog\`"
+            echo ""
+            echo "**Commit:** \`${SHA}\`"
+            echo ""
+            echo "### Commits incluidos"
+            echo "${{ steps.commits.outputs.list }}"
+            echo ""
+            echo "---"
+            echo "PR criado automaticamente apos merge em \`develop\`."
+            echo "Requer aprovacao manual antes do merge."
+          } > /tmp/pr-body.md
+
+          EXISTING=$(gh pr list --base homolog --head develop --json number --jq '.[0].number' 2>/dev/null || echo "")
+          if [ -n "$EXISTING" ]; then
+            gh pr edit "$EXISTING" --title "$TITLE" --body-file /tmp/pr-body.md
+            echo "PR #$EXISTING atualizado"
+          else
+            gh pr create --base homolog --head develop --title "$TITLE" --body-file /tmp/pr-body.md
+          fi
+
+  # ── homolog → main ─────────────────────────────────────────────────────────
+  promote-to-production:
+    name: Promover homolog → main
+    if: github.event_name == 'push' && github.ref_name == 'homolog'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Resolver commits novos
+        id: commits
+        run: |
+          SHA=$(git rev-parse --short HEAD)
+          echo "sha=${SHA}" >> "$GITHUB_OUTPUT"
+          COMMITS=$(git log origin/main..HEAD --pretty='- %s (%h)' 2>/dev/null || echo '- (historico indisponivel)')
+          echo "list<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$COMMITS"  >> "$GITHUB_OUTPUT"
+          echo "EOF"        >> "$GITHUB_OUTPUT"
+
+      - name: Criar ou atualizar PR homolog → main
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          SHA="${{ steps.commits.outputs.sha }}"
+          TITLE="chore: promote homolog -> main (${SHA})"
+          {
+            echo "## Promocao para Producao: \`homolog\` -> \`main\`"
+            echo ""
+            echo "ATENCAO: Requer aprovacao manual antes do merge. Esse merge dispara o deploy em producao."
+            echo ""
+            echo "**Commit:** \`${SHA}\`"
+            echo ""
+            echo "### Commits incluidos"
+            echo "${{ steps.commits.outputs.list }}"
+            echo ""
+            echo "---"
+            echo "PR criado automaticamente apos merge em \`homolog\`."
+          } > /tmp/pr-body.md
+
+          EXISTING=$(gh pr list --base main --head homolog --json number --jq '.[0].number' 2>/dev/null || echo "")
+          if [ -n "$EXISTING" ]; then
+            gh pr edit "$EXISTING" --title "$TITLE" --body-file /tmp/pr-body.md
+            echo "PR #$EXISTING atualizado"
+          else
+            gh pr create --base main --head homolog --title "$TITLE" --body-file /tmp/pr-body.md
+          fi
+
+  # ── backport hotfix → develop ──────────────────────────────────────────────
+  backport-hotfix:
+    name: Backport hotfix → develop
+    if: |
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.merged == true &&
+      contains(github.event.pull_request.labels.*.name, 'hotfix')
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Criar PR de backport para develop
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          HOTFIX_BRANCH: ${{ github.event.pull_request.head.ref }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          if ! git ls-remote --heads origin "$HOTFIX_BRANCH" | grep -q "$HOTFIX_BRANCH"; then
+            echo "Branch '$HOTFIX_BRANCH' ja foi deletada. Crie o backport manualmente."
+            exit 0
+          fi
+
+          EXISTING=$(gh pr list --base develop --head "$HOTFIX_BRANCH" --json number --jq '.[0].number' 2>/dev/null || echo "")
+          if [ -n "$EXISTING" ]; then
+            echo "PR #$EXISTING de backport ja existe"
+            exit 0
+          fi
+
+          {
+            echo "## Backport automatico de Hotfix"
+            echo ""
+            echo "Backport do PR #${PR_NUMBER} (\`${HOTFIX_BRANCH}\`) para \`develop\`."
+            echo ""
+            echo "**Titulo original:** ${PR_TITLE}"
+            echo ""
+            echo "Revisar possiveis conflitos com o estado atual de \`develop\` antes de fazer o merge."
+          } > /tmp/backport-body.md
+
+          gh pr create \
+            --base develop \
+            --head "$HOTFIX_BRANCH" \
+            --title "backport: ${HOTFIX_BRANCH} -> develop" \
+            --label "backport,hotfix" \
+            --body-file /tmp/backport-body.md

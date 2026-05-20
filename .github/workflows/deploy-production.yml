@@ -1,52 +1,27 @@
-name: CI / CD
+name: Deploy → Production
 
 on:
   push:
     branches: [main]
-  pull_request:
 
+# Nunca cancela um deploy em andamento
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: deploy-production
+  cancel-in-progress: false
 
 jobs:
-  # ── Integração contínua ──────────────────────────────────────────────────────
-  build:
-    name: Lint · Type · Build · Test
-    runs-on: ubuntu-latest
+  # ── CI final antes do deploy ────────────────────────────────────────────────
+  ci:
+    uses: ./.github/workflows/reusable-ci.yml
+    with:
+      docker-build: 'false'
 
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Check formatting
-        run: npm run format:check
-
-      - name: Type-check
-        run: npm run typecheck
-
-      - name: Build
-        run: npm run build
-
-      - name: Test
-        run: npm test
-
-  # ── Build e publicação da imagem Docker (só na main) ─────────────────────────
+  # ── Build e publicação da imagem Docker ─────────────────────────────────────
   publish:
     name: Build · Push → ghcr.io
-    needs: build
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: ci
     runs-on: ubuntu-latest
+    environment: production
     permissions:
       contents: read
       packages: write
@@ -90,9 +65,10 @@ jobs:
 
   # ── Deploy na Oracle VM ──────────────────────────────────────────────────────
   deploy:
-    name: Deploy → Oracle VM
+    name: Deploy → Oracle VM (Production)
     needs: publish
     runs-on: ubuntu-latest
+    environment: production
 
     steps:
       - uses: actions/checkout@v6
@@ -100,9 +76,9 @@ jobs:
       - name: Configurar SSH
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.ORACLE_SSH_KEY }}" > ~/.ssh/deploy_key
+          echo "${{ secrets.PROD_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H "${{ secrets.ORACLE_VM_IP }}" >> ~/.ssh/known_hosts
+          ssh-keyscan -H "${{ secrets.PROD_VM_IP }}" >> ~/.ssh/known_hosts
 
       - name: Sincronizar arquivos de infraestrutura
         run: |
@@ -114,27 +90,22 @@ jobs:
             --include='prisma/**' \
             --exclude='*' \
             -e "ssh -i ~/.ssh/deploy_key" \
-            . "${{ secrets.ORACLE_VM_USER }}@${{ secrets.ORACLE_VM_IP }}:~/whatsapp-chatbot-imobiliaria/"
+            . "${{ secrets.PROD_VM_USER }}@${{ secrets.PROD_VM_IP }}:~/whatsapp-chatbot-imobiliaria/"
 
       - name: Pull imagem e reiniciar containers
         env:
           IMAGE: ${{ needs.publish.outputs.image }}
-          VM_USER: ${{ secrets.ORACLE_VM_USER }}
-          VM_IP: ${{ secrets.ORACLE_VM_IP }}
         run: |
-          ssh -i ~/.ssh/deploy_key "${VM_USER}@${VM_IP}" \
+          ssh -i ~/.ssh/deploy_key "${{ secrets.PROD_VM_USER }}@${{ secrets.PROD_VM_IP }}" \
             "cd ~/whatsapp-chatbot-imobiliaria && \
-             DOCKER_IMAGE=${IMAGE}:latest \
+             DOCKER_IMAGE=${IMAGE}:${{ github.sha }} \
              docker compose -f docker-compose.yml -f docker-compose.prod.yml pull app && \
-             DOCKER_IMAGE=${IMAGE}:latest \
+             DOCKER_IMAGE=${IMAGE}:${{ github.sha }} \
              docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans 2>&1 | tail -30"
 
       - name: Verificar saúde da aplicação
-        env:
-          VM_USER: ${{ secrets.ORACLE_VM_USER }}
-          VM_IP: ${{ secrets.ORACLE_VM_IP }}
         run: |
-          ssh -i ~/.ssh/deploy_key "${VM_USER}@${VM_IP}" '
+          ssh -i ~/.ssh/deploy_key "${{ secrets.PROD_VM_USER }}@${{ secrets.PROD_VM_IP }}" '
             echo "Aguardando app inicializar..."
             for i in $(seq 1 10); do
               STATUS=$(docker inspect --format="{{.State.Health.Status}}" chatbot_imobiliaria_app 2>/dev/null || echo "not_found")
