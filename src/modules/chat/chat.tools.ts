@@ -120,7 +120,8 @@ export function buildChatTools(deps: ChatToolsDeps, phoneNumber: string): ChatTo
           if (hasCharacteristics) {
             const similar = await deps.properties.search(locationFilters);
             if (similar.length > 0) {
-              for (const p of similar) await deps.conversations.addViewedProperty(phoneNumber, p.code);
+              for (const p of similar)
+                await deps.conversations.addViewedProperty(phoneNumber, p.code);
               dispatchPropertyMedia(deps.whatsapp, phoneNumber, similar);
               return {
                 sugestaoSimilar: true,
@@ -137,7 +138,8 @@ export function buildChatTools(deps: ChatToolsDeps, phoneNumber: string): ChatTo
               neighborhood: undefined,
             });
             if (cityOnly.length > 0) {
-              for (const p of cityOnly) await deps.conversations.addViewedProperty(phoneNumber, p.code);
+              for (const p of cityOnly)
+                await deps.conversations.addViewedProperty(phoneNumber, p.code);
               dispatchPropertyMedia(deps.whatsapp, phoneNumber, cityOnly);
               return {
                 semResultadoNoBairro: true,

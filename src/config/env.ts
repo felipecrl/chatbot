@@ -67,14 +67,16 @@ const envSchema = z
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ['WHATSAPP_ACCESS_TOKEN'],
-            message: 'WHATSAPP_ACCESS_TOKEN is required when WHATSAPP_PROVIDER=meta and SKIP_WHATSAPP_SEND=false',
+            message:
+              'WHATSAPP_ACCESS_TOKEN is required when WHATSAPP_PROVIDER=meta and SKIP_WHATSAPP_SEND=false',
           });
         }
         if (!env.WHATSAPP_PHONE_NUMBER_ID) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ['WHATSAPP_PHONE_NUMBER_ID'],
-            message: 'WHATSAPP_PHONE_NUMBER_ID is required when WHATSAPP_PROVIDER=meta and SKIP_WHATSAPP_SEND=false',
+            message:
+              'WHATSAPP_PHONE_NUMBER_ID is required when WHATSAPP_PROVIDER=meta and SKIP_WHATSAPP_SEND=false',
           });
         }
       }
@@ -83,14 +85,16 @@ const envSchema = z
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ['UAZAPI_BASE_URL'],
-            message: 'UAZAPI_BASE_URL is required when WHATSAPP_PROVIDER=uazapi and SKIP_WHATSAPP_SEND=false',
+            message:
+              'UAZAPI_BASE_URL is required when WHATSAPP_PROVIDER=uazapi and SKIP_WHATSAPP_SEND=false',
           });
         }
         if (!env.UAZAPI_INSTANCE_TOKEN) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ['UAZAPI_INSTANCE_TOKEN'],
-            message: 'UAZAPI_INSTANCE_TOKEN is required when WHATSAPP_PROVIDER=uazapi and SKIP_WHATSAPP_SEND=false',
+            message:
+              'UAZAPI_INSTANCE_TOKEN is required when WHATSAPP_PROVIDER=uazapi and SKIP_WHATSAPP_SEND=false',
           });
         }
       }

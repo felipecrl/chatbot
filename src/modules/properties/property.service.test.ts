@@ -305,7 +305,9 @@ describe('PropertyService backed by the Imoview API', () => {
 
   it('falls back to urlfotoprincipal when fotos array is absent', async () => {
     const post = vi.fn().mockResolvedValue({
-      data: { lista: [{ codigo: 4, finalidade: 'Venda', urlfotoprincipal: 'http://img/main.jpg' }] },
+      data: {
+        lista: [{ codigo: 4, finalidade: 'Venda', urlfotoprincipal: 'http://img/main.jpg' }],
+      },
     });
     const [p] = await new PropertyService(clientWith(post)).search({});
     expect(p?.photos).toEqual(['http://img/main.jpg']);

@@ -2,7 +2,14 @@ import OpenAI from 'openai';
 import { config } from '../../config';
 import { logger } from '../../lib/logger';
 import { toErrorMeta } from '../../lib/errors';
-import type { AiService, ChatMessage, ChatRequest, ChatResult, ChatTool, TokenUsage } from './ai.types';
+import type {
+  AiService,
+  ChatMessage,
+  ChatRequest,
+  ChatResult,
+  ChatTool,
+  TokenUsage,
+} from './ai.types';
 
 const log = logger.child({ module: 'ai.openai' });
 

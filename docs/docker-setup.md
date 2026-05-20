@@ -24,16 +24,16 @@ newgrp docker              # ativa o grupo sem precisar de logout
 
 ## Ambientes
 
-|                        | Desenvolvimento            | Produção                        |
-| ---------------------- | -------------------------- | ------------------------------- |
-| Comando                | `make dev-docker`          | `make prod-up`                  |
-| Imagem                 | build local (Dockerfile)   | pré-construída via CI (ghcr.io) |
-| Banco                  | porta 5432 exposta no host | interno, sem exposição          |
-| HTTPS                  | não                        | sim (Caddy automático)          |
-| `NODE_ENV`             | `development`              | `production`                    |
-| `WHATSAPP_PROVIDER`    | `uazapi` (padrão)          | `meta` (forçado)                |
-| `USE_MOCK_AI`          | `true` (padrão)            | `false`                         |
-| `SKIP_WHATSAPP_SEND`   | `true` (padrão)            | `false`                         |
+|                      | Desenvolvimento            | Produção                        |
+| -------------------- | -------------------------- | ------------------------------- |
+| Comando              | `make dev-docker`          | `make prod-up`                  |
+| Imagem               | build local (Dockerfile)   | pré-construída via CI (ghcr.io) |
+| Banco                | porta 5432 exposta no host | interno, sem exposição          |
+| HTTPS                | não                        | sim (Caddy automático)          |
+| `NODE_ENV`           | `development`              | `production`                    |
+| `WHATSAPP_PROVIDER`  | `uazapi` (padrão)          | `meta` (forçado)                |
+| `USE_MOCK_AI`        | `true` (padrão)            | `false`                         |
+| `SKIP_WHATSAPP_SEND` | `true` (padrão)            | `false`                         |
 
 ---
 

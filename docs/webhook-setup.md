@@ -2,10 +2,10 @@
 
 O chatbot suporta dois providers de WhatsApp, cada um com configuração de webhook diferente:
 
-| Provider | Ambiente | Configuração                          |
-| -------- | -------- | ------------------------------------- |
-| `uazapi` | Dev      | Painel do uazapi.dev + ngrok          |
-| `meta`   | Produção | Meta for Developers + domínio HTTPS   |
+| Provider | Ambiente | Configuração                        |
+| -------- | -------- | ----------------------------------- |
+| `uazapi` | Dev      | Painel do uazapi.dev + ngrok        |
+| `meta`   | Produção | Meta for Developers + domínio HTTPS |
 
 ---
 
@@ -126,15 +126,15 @@ Envie uma mensagem para o número WhatsApp Business configurado.
 
 ## Variáveis de ambiente por provider
 
-| Variável                  | `uazapi` (dev)  | `meta` (prod)  |
-| ------------------------- | --------------- | -------------- |
-| `WHATSAPP_PROVIDER`       | `uazapi`        | `meta`         |
-| `UAZAPI_BASE_URL`         | obrigatório     | ignorado       |
-| `UAZAPI_INSTANCE_TOKEN`   | obrigatório     | ignorado       |
-| `WHATSAPP_ACCESS_TOKEN`   | ignorado        | obrigatório    |
-| `WHATSAPP_PHONE_NUMBER_ID`| ignorado        | obrigatório    |
-| `WHATSAPP_VERIFY_TOKEN`   | ignorado        | obrigatório    |
-| `WHATSAPP_APP_SECRET`     | ignorado        | recomendado    |
+| Variável                   | `uazapi` (dev) | `meta` (prod) |
+| -------------------------- | -------------- | ------------- |
+| `WHATSAPP_PROVIDER`        | `uazapi`       | `meta`        |
+| `UAZAPI_BASE_URL`          | obrigatório    | ignorado      |
+| `UAZAPI_INSTANCE_TOKEN`    | obrigatório    | ignorado      |
+| `WHATSAPP_ACCESS_TOKEN`    | ignorado       | obrigatório   |
+| `WHATSAPP_PHONE_NUMBER_ID` | ignorado       | obrigatório   |
+| `WHATSAPP_VERIFY_TOKEN`    | ignorado       | obrigatório   |
+| `WHATSAPP_APP_SECRET`      | ignorado       | recomendado   |
 
 ---
 
