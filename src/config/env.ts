@@ -14,14 +14,19 @@ const envSchema = z
     // Database
     DATABASE_URL: z.string().url(),
 
-    // WhatsApp / Meta Cloud API
-    // Credentials are required only when SKIP_WHATSAPP_SEND=false (validated in superRefine).
-    // In local dev with SKIP_WHATSAPP_SEND=true, placeholder values are accepted.
+    // WhatsApp provider — 'meta' for production (Meta Cloud API); 'uazapi' for dev/tests.
+    WHATSAPP_PROVIDER: z.enum(['meta', 'uazapi']).default('meta'),
+
+    // Meta Cloud API credentials (required when WHATSAPP_PROVIDER=meta and SKIP_WHATSAPP_SEND=false).
     WHATSAPP_ACCESS_TOKEN: z.string().default(''),
     WHATSAPP_PHONE_NUMBER_ID: z.string().default(''),
     WHATSAPP_VERIFY_TOKEN: z.string().default('local-dev'),
     WHATSAPP_API_VERSION: z.string().default('v20.0'),
     WHATSAPP_APP_SECRET: z.string().optional(),
+
+    // uazapi (required when WHATSAPP_PROVIDER=uazapi and SKIP_WHATSAPP_SEND=false).
+    UAZAPI_BASE_URL: z.string().url().optional(),
+    UAZAPI_INSTANCE_TOKEN: z.string().optional(),
 
     // OpenAI
     OPENAI_API_KEY: z.string().optional(),
@@ -57,19 +62,41 @@ const envSchema = z
       });
     }
     if (!env.SKIP_WHATSAPP_SEND) {
-      if (!env.WHATSAPP_ACCESS_TOKEN) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['WHATSAPP_ACCESS_TOKEN'],
-          message: 'WHATSAPP_ACCESS_TOKEN is required unless SKIP_WHATSAPP_SEND=true',
-        });
+      if (env.WHATSAPP_PROVIDER === 'meta') {
+        if (!env.WHATSAPP_ACCESS_TOKEN) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['WHATSAPP_ACCESS_TOKEN'],
+            message:
+              'WHATSAPP_ACCESS_TOKEN is required when WHATSAPP_PROVIDER=meta and SKIP_WHATSAPP_SEND=false',
+          });
+        }
+        if (!env.WHATSAPP_PHONE_NUMBER_ID) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['WHATSAPP_PHONE_NUMBER_ID'],
+            message:
+              'WHATSAPP_PHONE_NUMBER_ID is required when WHATSAPP_PROVIDER=meta and SKIP_WHATSAPP_SEND=false',
+          });
+        }
       }
-      if (!env.WHATSAPP_PHONE_NUMBER_ID) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['WHATSAPP_PHONE_NUMBER_ID'],
-          message: 'WHATSAPP_PHONE_NUMBER_ID is required unless SKIP_WHATSAPP_SEND=true',
-        });
+      if (env.WHATSAPP_PROVIDER === 'uazapi') {
+        if (!env.UAZAPI_BASE_URL) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['UAZAPI_BASE_URL'],
+            message:
+              'UAZAPI_BASE_URL is required when WHATSAPP_PROVIDER=uazapi and SKIP_WHATSAPP_SEND=false',
+          });
+        }
+        if (!env.UAZAPI_INSTANCE_TOKEN) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['UAZAPI_INSTANCE_TOKEN'],
+            message:
+              'UAZAPI_INSTANCE_TOKEN is required when WHATSAPP_PROVIDER=uazapi and SKIP_WHATSAPP_SEND=false',
+          });
+        }
       }
     }
   });

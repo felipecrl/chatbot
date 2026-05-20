@@ -31,6 +31,7 @@ newgrp docker              # ativa o grupo sem precisar de logout
 | Banco                | porta 5432 exposta no host | interno, sem exposição          |
 | HTTPS                | não                        | sim (Caddy automático)          |
 | `NODE_ENV`           | `development`              | `production`                    |
+| `WHATSAPP_PROVIDER`  | `uazapi` (padrão)          | `meta` (forçado)                |
 | `USE_MOCK_AI`        | `true` (padrão)            | `false`                         |
 | `SKIP_WHATSAPP_SEND` | `true` (padrão)            | `false`                         |
 
@@ -43,8 +44,9 @@ newgrp docker              # ativa o grupo sem precisar de logout
 ```bash
 cp .env.example .env
 # Os defaults do .env.example já são seguros para dev:
-#   USE_MOCK_AI=true        → sem custo de API
-#   SKIP_WHATSAPP_SEND=true → sem envio real ao WhatsApp
+#   WHATSAPP_PROVIDER=uazapi → usa uazapi.dev (preencha UAZAPI_INSTANCE_TOKEN)
+#   USE_MOCK_AI=true         → sem custo de API
+#   SKIP_WHATSAPP_SEND=true  → sem envio real ao WhatsApp
 ```
 
 ### 2. Subir os containers

@@ -9,7 +9,7 @@ import {
 import type { LeadService } from '../leads/lead.service';
 import type { PropertyService } from '../properties/property.service';
 import type { Property, PropertySearchFilters } from '../properties/property.types';
-import type { WhatsAppService } from '../whatsapp/whatsapp.service';
+import type { IWhatsAppService } from '../whatsapp/whatsapp.types';
 import { toPropertyDigest } from './chat.types';
 
 const log = logger.child({ module: 'chat.tools' });
@@ -18,7 +18,7 @@ export interface ChatToolsDeps {
   conversations: ConversationRepository;
   properties: PropertyService;
   leads: LeadService;
-  whatsapp: WhatsAppService;
+  whatsapp: IWhatsAppService;
 }
 
 const searchArgsSchema = z.object({
@@ -120,7 +120,8 @@ export function buildChatTools(deps: ChatToolsDeps, phoneNumber: string): ChatTo
           if (hasCharacteristics) {
             const similar = await deps.properties.search(locationFilters);
             if (similar.length > 0) {
-              for (const p of similar) await deps.conversations.addViewedProperty(phoneNumber, p.code);
+              for (const p of similar)
+                await deps.conversations.addViewedProperty(phoneNumber, p.code);
               dispatchPropertyMedia(deps.whatsapp, phoneNumber, similar);
               return {
                 sugestaoSimilar: true,
@@ -137,7 +138,8 @@ export function buildChatTools(deps: ChatToolsDeps, phoneNumber: string): ChatTo
               neighborhood: undefined,
             });
             if (cityOnly.length > 0) {
-              for (const p of cityOnly) await deps.conversations.addViewedProperty(phoneNumber, p.code);
+              for (const p of cityOnly)
+                await deps.conversations.addViewedProperty(phoneNumber, p.code);
               dispatchPropertyMedia(deps.whatsapp, phoneNumber, cityOnly);
               return {
                 semResultadoNoBairro: true,
@@ -279,7 +281,7 @@ export function buildChatTools(deps: ChatToolsDeps, phoneNumber: string): ChatTo
  * wait for it, but any failure is contained and logged here.
  */
 function dispatchPropertyMedia(
-  whatsapp: WhatsAppService,
+  whatsapp: IWhatsAppService,
   phoneNumber: string,
   properties: Property[],
 ): void {

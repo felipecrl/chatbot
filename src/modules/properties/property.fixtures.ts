@@ -57,10 +57,7 @@ function sampleProperties(): Property[] {
 }
 
 function normalizeText(text: string): string {
-  return text
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '');
+  return text.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 }
 
 export function searchSampleProperties(filters: PropertySearchFilters, limit: number): Property[] {
@@ -70,9 +67,7 @@ export function searchSampleProperties(filters: PropertySearchFilters, limit: nu
       (p) => !filters.type || (p.type ?? '').toLowerCase().includes(filters.type.toLowerCase()),
     )
     .filter(
-      (p) =>
-        !filters.city ||
-        normalizeText(p.city ?? '').includes(normalizeText(filters.city)),
+      (p) => !filters.city || normalizeText(p.city ?? '').includes(normalizeText(filters.city)),
     )
     .filter(
       (p) =>

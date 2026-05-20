@@ -17,6 +17,8 @@ export const config = {
     url: env.DATABASE_URL,
   },
 
+  whatsappProvider: env.WHATSAPP_PROVIDER,
+
   whatsapp: {
     accessToken: env.WHATSAPP_ACCESS_TOKEN,
     phoneNumberId: env.WHATSAPP_PHONE_NUMBER_ID,
@@ -25,6 +27,11 @@ export const config = {
     appSecret: env.WHATSAPP_APP_SECRET,
     baseUrl: `https://graph.facebook.com/${env.WHATSAPP_API_VERSION}/${env.WHATSAPP_PHONE_NUMBER_ID}`,
     skipSend: env.SKIP_WHATSAPP_SEND,
+  },
+
+  uazapi: {
+    baseUrl: env.UAZAPI_BASE_URL ?? 'https://free.uazapi.com',
+    instanceToken: env.UAZAPI_INSTANCE_TOKEN ?? '',
   },
 
   openai: {

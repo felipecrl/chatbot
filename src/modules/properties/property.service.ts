@@ -70,7 +70,9 @@ export class PropertyService {
     const locationCodes = await this.resolveLocationCodes(filters, finalidade);
 
     if (locationCodes.cityNotInCatalog) {
-      log.debug('Cidade não encontrada no catálogo Imoview — retornando vazio', { city: filters.city });
+      log.debug('Cidade não encontrada no catálogo Imoview — retornando vazio', {
+        city: filters.city,
+      });
       return [];
     }
 
@@ -140,7 +142,11 @@ export class PropertyService {
 
         if (match) {
           codes.codigosbairros = String(match.codigo);
-          log.debug('Bairro resolvido', { input: neighborhood, match: match.nome, codigo: match.codigo });
+          log.debug('Bairro resolvido', {
+            input: neighborhood,
+            match: match.nome,
+            codigo: match.codigo,
+          });
         }
       } catch (error) {
         log.warn('Falha ao resolver código do bairro', toErrorMeta(error));
@@ -200,10 +206,7 @@ export class PropertyService {
 
 /** Lowercase + strip accents for fuzzy comparison. */
 function normalizeText(text: string): string {
-  return text
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '');
+  return text.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 }
 
 function extractList(data: unknown): RawProperty[] {
@@ -217,8 +220,7 @@ function extractList(data: unknown): RawProperty[] {
 
 function normalizeProperty(raw: RawProperty): Property {
   const codigo = raw.codigo;
-  const code =
-    typeof codigo === 'number' ? String(codigo) : (asScalarString(codigo) ?? '');
+  const code = typeof codigo === 'number' ? String(codigo) : (asScalarString(codigo) ?? '');
 
   const finalidade = asString(raw.finalidade)?.toLowerCase() ?? '';
   const transaction: PropertyTransaction = finalidade.includes('alug') ? 'aluguel' : 'venda';

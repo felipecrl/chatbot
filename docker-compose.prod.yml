@@ -12,6 +12,7 @@ services:
     image: ${DOCKER_IMAGE}
     environment:
       NODE_ENV: production
+      WHATSAPP_PROVIDER: meta
       USE_MOCK_AI: 'false'
       SKIP_WHATSAPP_SEND: 'false'
     ports: !reset []

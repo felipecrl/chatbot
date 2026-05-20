@@ -1,4 +1,4 @@
-.PHONY: help \
+.PHONY: help start stop \
         dev dev-docker dev-down dev-logs dev-build dev-db-shell \
         prod-up prod-down prod-logs prod-restart \
         migrate studio test lint build
@@ -6,21 +6,25 @@
 # ── Ajuda ─────────────────────────────────────────────────────────────────────
 help:
 	@echo ""
+	@echo "  COMANDOS PRINCIPAIS"
+	@echo "    make start               setup completo: garante .env e sobe os containers"
+	@echo "    make stop                derruba todos os containers"
+	@echo ""
 	@echo "  DESENVOLVIMENTO LOCAL (sem Docker)"
 	@echo "    make dev            tsx watch — hot-reload, requer Postgres local ou dev-docker"
 	@echo ""
-	@echo "  DESENVOLVIMENTO (Docker Compose)"
-	@echo "    make dev-docker     sobe postgres + app em modo dev (build local)"
-	@echo "    make dev-down       derruba os containers de dev"
-	@echo "    make dev-logs       segue os logs do app em dev"
-	@echo "    make dev-build      reconstrói a imagem e sobe"
-	@echo "    make dev-db-shell   abre psql dentro do container do Postgres"
+	@echo "  DESENVOLVIMENTO (Docker Compose — controle granular)"
+	@echo "    make dev-docker          sobe postgres + app"
+	@echo "    make dev-down            derruba os containers de dev"
+	@echo "    make dev-logs            segue os logs do app"
+	@echo "    make dev-build           reconstrói a imagem e sobe"
+	@echo "    make dev-db-shell        abre psql dentro do container do Postgres"
 	@echo ""
 	@echo "  PRODUÇÃO (Oracle VM — rodar localmente só para testes)"
 	@echo "    make prod-up        sobe com overrides de prod (requer DOCKER_IMAGE no .env)"
 	@echo "    make prod-down      derruba os containers de prod"
 	@echo "    make prod-logs      segue os logs do app em prod"
-	@echo "    make prod-restart   recria containers sem rebuiidar a imagem"
+	@echo "    make prod-restart   recria containers sem rebuildar a imagem"
 	@echo ""
 	@echo "  BANCO DE DADOS"
 	@echo "    make migrate        cria e aplica nova migration (dev)"
@@ -31,6 +35,13 @@ help:
 	@echo "    make lint           verifica lint e formatação"
 	@echo "    make build          compila TypeScript para dist/"
 	@echo ""
+
+# ── Comandos principais ───────────────────────────────────────────────────────
+start:
+	@bash scripts/dev-start.sh
+
+stop:
+	docker compose down
 
 # ── Dev local (sem Docker) ─────────────────────────────────────────────────────
 dev:

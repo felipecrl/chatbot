@@ -7,16 +7,12 @@ import type { Property } from '../properties/property.types';
 import type { IWhatsAppService } from './whatsapp.types';
 import { formatPropertyMessage } from './whatsapp.mapper';
 
-const log = logger.child({ module: 'whatsapp' });
+const log = logger.child({ module: 'uazapi' });
 
-const SEND_INTERVAL_MS = 500;
+const SEND_INTERVAL_MS = 1000;
 
-interface SendMessageResponse {
-  messages?: Array<{ id?: string }>;
-}
-
-/** Thin client over the Meta Cloud API for sending outbound WhatsApp messages. */
-export class WhatsAppService implements IWhatsAppService {
+/** Thin client over the uazapi REST API for sending outbound WhatsApp messages. */
+export class UzapiWhatsAppService implements IWhatsAppService {
   private readonly client: AxiosInstance;
   private readonly skipSend: boolean;
 
@@ -25,10 +21,10 @@ export class WhatsAppService implements IWhatsAppService {
     this.client =
       client ??
       createHttpClient({
-        serviceName: 'whatsapp',
-        baseURL: config.whatsapp.baseUrl,
+        serviceName: 'uazapi',
+        baseURL: config.uazapi.baseUrl,
         headers: {
-          Authorization: `Bearer ${config.whatsapp.accessToken}`,
+          token: config.uazapi.instanceToken,
           'Content-Type': 'application/json',
         },
       });
@@ -39,14 +35,8 @@ export class WhatsAppService implements IWhatsAppService {
       log.info('SKIP_WHATSAPP_SEND ativo — texto não enviado', { to, preview: body.slice(0, 100) });
       return;
     }
-    const { data } = await this.client.post<SendMessageResponse>('/messages', {
-      messaging_product: 'whatsapp',
-      recipient_type: 'individual',
-      to,
-      type: 'text',
-      text: { body },
-    });
-    log.debug('Texto enviado', { to, messageId: data.messages?.[0]?.id });
+    await this.client.post('/send/text', { number: stripJid(to), text: body });
+    log.debug('Texto enviado via uazapi', { to });
   }
 
   async sendImage(to: string, imageUrl: string, caption?: string): Promise<void> {
@@ -54,14 +44,10 @@ export class WhatsAppService implements IWhatsAppService {
       log.info('SKIP_WHATSAPP_SEND ativo — imagem não enviada', { to, imageUrl });
       return;
     }
-    await this.client.post<SendMessageResponse>('/messages', {
-      messaging_product: 'whatsapp',
-      recipient_type: 'individual',
-      to,
-      type: 'image',
-      image: { link: imageUrl, caption },
-    });
-    log.debug('Imagem enviada', { to, imageUrl });
+    // uazapi /send/media requires multipart file upload; fall back to a text link.
+    const text = caption ? `${caption}\n${imageUrl}` : imageUrl;
+    await this.client.post('/send/text', { number: stripJid(to), text });
+    log.debug('Imagem enviada como link de texto via uazapi', { to, imageUrl });
   }
 
   async sendProperty(to: string, property: Property): Promise<void> {
@@ -85,19 +71,11 @@ export class WhatsAppService implements IWhatsAppService {
     }
   }
 
-  async markAsRead(messageId: string): Promise<void> {
-    if (this.skipSend) return;
-    try {
-      await this.client.post('/messages', {
-        messaging_product: 'whatsapp',
-        status: 'read',
-        message_id: messageId,
-      });
-    } catch (error) {
-      // Non-critical: a failed read receipt should never interrupt processing.
-      log.debug('Falha ao marcar mensagem como lida', { messageId, ...toErrorMeta(error) });
-    }
-  }
+  async markAsRead(_messageId: string): Promise<void> {}
+}
+
+function stripJid(jidOrNumber: string): string {
+  return jidOrNumber.replace(/@s\.whatsapp\.net$/, '').replace(/@c\.us$/, '');
 }
 
 function delay(ms: number): Promise<void> {

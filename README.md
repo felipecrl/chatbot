@@ -56,17 +56,24 @@ src/
 │   ├── leads/                    # LeadRepository + LeadService (persistência + sync CRM)
 │   ├── crm/                      # CrmService (IMOVIEW)
 │   ├── properties/               # PropertyService (Imoview) + catálogo de exemplo
-│   └── whatsapp/                 # WhatsAppService (envio), mapper (payload), verificação de assinatura
+│   └── whatsapp/                 # providers (Meta, uazapi), mapper de payload, verificação de assinatura
 └── types/                        # type augmentations
 prisma/
 ├── schema.prisma                 # modelos Conversation e Lead
 └── migrations/                   # migrations versionadas
 ```
 
-**Fluxo de uma mensagem:** Meta → `POST /webhook` (responde `200` na hora) → `ChatService`
+**Providers WhatsApp:**
+
+| Provider | Uso          | Como configurar                                                            |
+| -------- | ------------ | -------------------------------------------------------------------------- |
+| `meta`   | Produção     | Meta Cloud API — ver [docs/webhook-setup.md](docs/webhook-setup.md)        |
+| `uazapi` | Dev / testes | uazapi.dev (gratuito) — ver [docs/webhook-setup.md](docs/webhook-setup.md) |
+
+**Fluxo de uma mensagem:** Provider → `POST /webhook` (responde `200` na hora) → `ChatService`
 processa em background → `AiService.chat()` com as ferramentas (`buscar_imoveis`,
 `obter_detalhes_imovel`, `agendar_visita`, `transferir_para_humano`) → resposta enviada ao
-usuário via `WhatsAppService`. Sem `OPENAI_API_KEY` configurada, um `MockAiService` responde
+usuário via o provider configurado. Sem `OPENAI_API_KEY` configurada, um `MockAiService` responde
 sem custo; sem `IMOVIEW_*`, um catálogo de exemplo é usado e os leads ficam apenas no banco local.
 
 ---
@@ -75,7 +82,8 @@ sem custo; sem `IMOVIEW_*`, um catálogo de exemplo é usado e os leads ficam ap
 
 - **Node.js >= 20** (ver `.nvmrc` — recomendado Node 22)
 - **PostgreSQL 14+** (ou use o `docker-compose`)
-- Conta na **Meta for Developers** com um app WhatsApp Business (ver [docs/webhook-setup.md](docs/webhook-setup.md))
+- Para **desenvolvimento**: conta gratuita no [uazapi.dev](https://uazapi.dev) + ngrok
+- Para **produção**: conta na **Meta for Developers** com app WhatsApp Business (ver [docs/webhook-setup.md](docs/webhook-setup.md))
 - Opcional: chave de API da **OpenAI** (sem ela, o modo mock é ativado automaticamente)
 
 ---
@@ -84,8 +92,8 @@ sem custo; sem `IMOVIEW_*`, um catálogo de exemplo é usado e os leads ficam ap
 
 ```bash
 cp .env.example .env
-# preencha pelo menos: DATABASE_URL, WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_VERIFY_TOKEN
-# (OPENAI_API_KEY é opcional — sem ela o chatbot roda em modo mock)
+# Para dev: preencha UAZAPI_INSTANCE_TOKEN (obtido no painel do uazapi.dev)
+# Para prod: preencha WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, OPENAI_API_KEY
 ```
 
 A configuração é validada na inicialização ([`src/config/env.ts`](src/config/env.ts)). Se faltar
@@ -101,13 +109,14 @@ npm run db:deploy           # aplica as migrations no banco apontado por DATABAS
 npm run dev                 # inicia em modo watch (tsx)
 ```
 
-A API sobe em `http://localhost:3000`. Para expor o webhook em desenvolvimento, use um túnel
-(ex.: ngrok) — ver [docs/webhook-setup.md](docs/webhook-setup.md).
+A API sobe em `http://localhost:3000`. Para receber webhooks do uazapi em desenvolvimento, exponha
+a porta com ngrok — ver [docs/webhook-setup.md](docs/webhook-setup.md).
 
 Dicas para desenvolvimento sem custos / sem WhatsApp real:
 
 - `USE_MOCK_AI=true` — usa respostas simuladas em vez da OpenAI (padrão quando `OPENAI_API_KEY` está vazia)
 - `SKIP_WHATSAPP_SEND=true` — não envia mensagens ao WhatsApp, apenas registra nos logs
+- `WHATSAPP_PROVIDER=uazapi` com conta gratuita no uazapi.dev — WhatsApp real sem custo de infra
 
 ---
 
@@ -118,7 +127,7 @@ Existem dois modos de uso com Docker Compose.
 **Desenvolvimento** — build local, banco exposto na porta 5432:
 
 ```bash
-cp .env.example .env   # defaults já seguros para dev (USE_MOCK_AI=true, SKIP_WHATSAPP_SEND=true)
+cp .env.example .env   # ajuste UAZAPI_INSTANCE_TOKEN para seu token
 make dev-docker        # sobe postgres + app (build local)
 make dev-logs          # acompanha os logs
 curl http://localhost:3000/health
@@ -130,7 +139,8 @@ Para reconstruir a imagem após alterar o código:
 make dev-build
 ```
 
-**Produção** — imagem pré-construída do ghcr.io, Caddy com HTTPS, banco sem exposição externa:
+**Produção** — imagem pré-construída do ghcr.io, Caddy com HTTPS, banco sem exposição externa.
+Em produção, `WHATSAPP_PROVIDER=meta` é imposto automaticamente pelo `docker-compose.prod.yml`:
 
 ```bash
 make prod-up           # usa docker-compose.yml + docker-compose.prod.yml
@@ -194,37 +204,40 @@ formatação, type-check, build e testes em cada push/PR.
 
 Lista completa e comentada em [`.env.example`](.env.example). Resumo:
 
-| Variável                                              | Obrigatória | Padrão                             | Descrição                                                       |
-| ----------------------------------------------------- | ----------- | ---------------------------------- | --------------------------------------------------------------- |
-| `NODE_ENV`                                            | não         | `development`                      | `development` \| `test` \| `production`                         |
-| `PORT`                                                | não         | `3000`                             | Porta HTTP                                                      |
-| `LOG_LEVEL`                                           | não         | `debug` (dev) / `info` (prod)      | `error` \| `warn` \| `info` \| `http` \| `debug`                |
-| `DATABASE_URL`                                        | **sim**     | —                                  | URL de conexão do PostgreSQL                                    |
-| `WHATSAPP_ACCESS_TOKEN`                               | **sim**     | —                                  | Token da Meta Cloud API                                         |
-| `WHATSAPP_PHONE_NUMBER_ID`                            | **sim**     | —                                  | ID do número de WhatsApp Business                               |
-| `WHATSAPP_VERIFY_TOKEN`                               | **sim**     | —                                  | Token de verificação do webhook (você define)                   |
-| `WHATSAPP_API_VERSION`                                | não         | `v20.0`                            | Versão da Graph API                                             |
-| `WHATSAPP_APP_SECRET`                                 | não         | —                                  | Habilita a verificação da assinatura `X-Hub-Signature-256`      |
-| `OPENAI_API_KEY`                                      | não\*       | —                                  | Chave da OpenAI (\*obrigatória se `USE_MOCK_AI` não for `true`) |
-| `OPENAI_MODEL`                                        | não         | `gpt-4o`                           | Modelo do chat                                                  |
-| `USE_MOCK_AI`                                         | não         | `true` quando sem `OPENAI_API_KEY` | Usa respostas simuladas                                         |
-| `IMOVIEW_API_URL` / `_API_KEY` / `IMOVIEW_EMPRESA_ID` | não         | —                                  | Catálogo de imóveis + CRM (sem isso, usa catálogo de exemplo e leads ficam só no banco local) |
-| `SKIP_WHATSAPP_SEND`                                  | não         | `false`                            | Não envia mensagens ao WhatsApp (apenas loga)                   |
-| `EMPRESA_NOME` / `EMPRESA_CIDADE`                     | não         | `Imobiliária` / `Belo Horizonte`   | Usados nas respostas                                            |
-| `MAX_IMOVEIS_POR_RESPOSTA`                            | não         | `3`                                | Máximo de imóveis por resposta                                  |
-| `CONVERSA_TIMEOUT_MINUTOS`                            | não         | `60`                               | Inatividade antes de encerrar a conversa                        |
-| `CONVERSATION_CLEANUP_INTERVAL_MINUTES`               | não         | `60`                               | Frequência do job de limpeza                                    |
+| Variável                                              | Obrigatória  | Padrão                             | Descrição                                                       |
+| ----------------------------------------------------- | ------------ | ---------------------------------- | --------------------------------------------------------------- |
+| `NODE_ENV`                                            | não          | `development`                      | `development` \| `test` \| `production`                         |
+| `PORT`                                                | não          | `3000`                             | Porta HTTP                                                      |
+| `LOG_LEVEL`                                           | não          | `debug` (dev) / `info` (prod)      | `error` \| `warn` \| `info` \| `http` \| `debug`                |
+| `DATABASE_URL`                                        | **sim**      | —                                  | URL de conexão do PostgreSQL                                    |
+| `WHATSAPP_PROVIDER`                                   | não          | `meta`                             | `meta` (prod) \| `uazapi` (dev)                                 |
+| `WHATSAPP_ACCESS_TOKEN`                               | prod         | —                                  | Token da Meta Cloud API                                         |
+| `WHATSAPP_PHONE_NUMBER_ID`                            | prod         | —                                  | ID do número de WhatsApp Business                               |
+| `WHATSAPP_VERIFY_TOKEN`                               | prod         | `local-dev`                        | Token de verificação do webhook (você define)                   |
+| `WHATSAPP_API_VERSION`                                | não          | `v20.0`                            | Versão da Graph API                                             |
+| `WHATSAPP_APP_SECRET`                                 | não          | —                                  | Habilita a verificação da assinatura `X-Hub-Signature-256`      |
+| `UAZAPI_BASE_URL`                                     | dev (uazapi) | `https://free.uazapi.com`          | URL base da API do uazapi                                       |
+| `UAZAPI_INSTANCE_TOKEN`                               | dev (uazapi) | —                                  | Token da instância uazapi (obtido no painel do uazapi.dev)      |
+| `OPENAI_API_KEY`                                      | não\*        | —                                  | Chave da OpenAI (\*obrigatória se `USE_MOCK_AI` não for `true`) |
+| `OPENAI_MODEL`                                        | não          | `gpt-4o`                           | Modelo do chat                                                  |
+| `USE_MOCK_AI`                                         | não          | `true` quando sem `OPENAI_API_KEY` | Usa respostas simuladas                                         |
+| `IMOVIEW_API_URL` / `_API_KEY` / `IMOVIEW_EMPRESA_ID` | não          | —                                  | Catálogo de imóveis + CRM (sem isso, usa catálogo de exemplo)   |
+| `SKIP_WHATSAPP_SEND`                                  | não          | `false`                            | Não envia mensagens ao WhatsApp (apenas loga)                   |
+| `EMPRESA_NOME` / `EMPRESA_CIDADE`                     | não          | `Imobiliária` / `Belo Horizonte`   | Usados nas respostas                                            |
+| `MAX_IMOVEIS_POR_RESPOSTA`                            | não          | `3`                                | Máximo de imóveis por resposta                                  |
+| `CONVERSA_TIMEOUT_MINUTOS`                            | não          | `60`                               | Inatividade antes de encerrar a conversa                        |
+| `CONVERSATION_CLEANUP_INTERVAL_MINUTES`               | não          | `60`                               | Frequência do job de limpeza                                    |
 
 ---
 
 ## Endpoints HTTP
 
-| Método | Rota       | Descrição                                                                                                                                                  |
-| ------ | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET`  | `/`        | Identificação do serviço                                                                                                                                   |
-| `GET`  | `/health`  | Health check (verifica o banco) — `200` saudável, `503` degradado                                                                                          |
-| `GET`  | `/webhook` | Handshake de verificação da Meta (`hub.challenge`)                                                                                                         |
-| `POST` | `/webhook` | Recebimento de mensagens (responde `200` imediatamente; processa em background; valida `X-Hub-Signature-256` se `WHATSAPP_APP_SECRET` estiver configurado) |
+| Método | Rota       | Descrição                                                                                |
+| ------ | ---------- | ---------------------------------------------------------------------------------------- |
+| `GET`  | `/`        | Identificação do serviço                                                                 |
+| `GET`  | `/health`  | Health check (verifica o banco) — `200` saudável, `503` degradado                        |
+| `GET`  | `/webhook` | Handshake de verificação da Meta (`hub.challenge`) — apenas com `WHATSAPP_PROVIDER=meta` |
+| `POST` | `/webhook` | Recebimento de mensagens (responde `200` imediatamente; processa em background)          |
 
 ---
 
@@ -239,7 +252,8 @@ O deploy em produção é feito automaticamente pelo pipeline de CI/CD
    os containers na Oracle VM via SSH
 
 A imagem é multi-stage (build + runtime enxuto, usuário não-root, `HEALTHCHECK` nativo). O Caddy
-cuida do HTTPS automático.
+cuida do HTTPS automático. Em produção, `WHATSAPP_PROVIDER=meta` é forçado automaticamente pelo
+`docker-compose.prod.yml`.
 
 Para subir manualmente em produção (requer `DOCKER_IMAGE` configurado no `.env` da VM):
 
@@ -254,5 +268,5 @@ Ajuste o domínio em [`Caddyfile`](Caddyfile) e configure o webhook na Meta apon
 
 ## Documentação adicional
 
-- [docs/webhook-setup.md](docs/webhook-setup.md) — configuração do app na Meta e do webhook
+- [docs/webhook-setup.md](docs/webhook-setup.md) — configuração do webhook (uazapi para dev, Meta para prod)
 - [docs/docker-setup.md](docs/docker-setup.md) — Docker / PostgreSQL / troubleshooting
