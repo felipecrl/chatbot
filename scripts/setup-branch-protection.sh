@@ -67,7 +67,7 @@ protect_branch() {
     "strict": true,
     "contexts": ${contexts_json}
   },
-  "enforce_admins": false,
+  "enforce_admins": true,
   "required_pull_request_reviews": ${review_rules},
   "restrictions": null,
   "allow_force_pushes": false,
