@@ -14,7 +14,7 @@ jobs:
   ci:
     uses: ./.github/workflows/reusable-ci.yml
     with:
-      docker-build: 'false'
+      docker-build: 'true'
 
   # ── Build e publicação da imagem Docker ─────────────────────────────────────
   publish:
@@ -30,7 +30,7 @@ jobs:
       image: ${{ steps.image.outputs.name }}
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
       - name: Calcular nome da imagem (lowercase)
         id: image
@@ -71,7 +71,7 @@ jobs:
     environment: production
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
       - name: Configurar SSH
         run: |
@@ -92,6 +92,15 @@ jobs:
             -e "ssh -i ~/.ssh/deploy_key" \
             . "${{ secrets.PROD_VM_USER }}@${{ secrets.PROD_VM_IP }}:~/whatsapp-chatbot-imobiliaria/"
 
+      - name: Guardar imagem anterior para rollback
+        env:
+          IMAGE: ${{ needs.publish.outputs.image }}
+        run: |
+          ssh -i ~/.ssh/deploy_key "${{ secrets.PROD_VM_USER }}@${{ secrets.PROD_VM_IP }}" \
+            "cd ~/whatsapp-chatbot-imobiliaria && \
+             PREVIOUS_IMAGE=\$(docker inspect --format='{{.Image}}' chatbot_imobiliaria_app 2>/dev/null || echo 'none') && \
+             echo \$PREVIOUS_IMAGE > /tmp/previous_image.txt"
+
       - name: Pull imagem e reiniciar containers
         env:
           IMAGE: ${{ needs.publish.outputs.image }}
@@ -103,7 +112,7 @@ jobs:
              DOCKER_IMAGE=${IMAGE}:${{ github.sha }} \
              docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans 2>&1 | tail -30"
 
-      - name: Verificar saúde da aplicação
+      - name: Verificar saúde da aplicação (com rollback automático)
         run: |
           ssh -i ~/.ssh/deploy_key "${{ secrets.PROD_VM_USER }}@${{ secrets.PROD_VM_IP }}" '
             echo "Aguardando app inicializar..."
@@ -116,8 +125,31 @@ jobs:
               echo "  tentativa ${i}/10 — status: ${STATUS} — aguardando 10s..."
               sleep 10
             done
-            echo "✗ Health check falhou após 100s. Logs do container:"
+
+            echo "✗ Health check falhou após 100s. Iniciando rollback automático..."
             cd ~/whatsapp-chatbot-imobiliaria
             docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=50 app
-            exit 1
+
+            # Rollback: voltar para a imagem anterior
+            PREVIOUS_IMAGE=$(cat /tmp/previous_image.txt 2>/dev/null || echo "none")
+            if [ "$PREVIOUS_IMAGE" != "none" ] && [ -n "$PREVIOUS_IMAGE" ]; then
+              echo "Restaurando imagem anterior: $PREVIOUS_IMAGE"
+              docker compose -f docker-compose.yml -f docker-compose.prod.yml down
+              docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans 2>&1 | tail -20
+
+              # Aguardar rollback container ficar saudável
+              for j in $(seq 1 5); do
+                ROLLBACK_STATUS=$(docker inspect --format="{{.State.Health.Status}}" chatbot_imobiliaria_app 2>/dev/null || echo "not_found")
+                if [ "$ROLLBACK_STATUS" = "healthy" ]; then
+                  echo "⚠ Rollback bem-sucedido. Container anterior restaurado."
+                  exit 1
+                fi
+                sleep 10
+              done
+              echo "⚠ Rollback não confirmou saúde. Verifique manualmente."
+              exit 1
+            else
+              echo "⚠ Sem imagem anterior para rollback. Falha crítica."
+              exit 1
+            fi
           '
