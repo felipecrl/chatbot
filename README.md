@@ -243,124 +243,15 @@ Lista completa e comentada em [`.env.example`](.env.example). Resumo:
 
 ---
 
-## GitFlow e CI/CD
-
-Este projeto segue um **GitFlow** com 3 ambientes: `develop`, `homolog` e `main` (produção).
-
-**Fluxo de um PR:**
-
-```
-feature/xxx ou fix/xxx
-    ↓
-[auto-pr.yml] → cria PR para develop automaticamente
-    ↓
-[validate-pr.yml] → CI (lint, build, test)
-    ↓
-[Merge em develop] → Squash merge
-    ↓
-[promote.yml] → cria PR develop → homolog automaticamente
-    ↓
-[validate-pr.yml] → CI + Docker build test
-    ↓
-[Merge em homolog] → Squash merge (aprovação manual)
-    ↓
-[promote.yml] → cria PR homolog → main automaticamente
-    ↓
-[validate-pr.yml] → CI + requer 1 reviewer
-    ↓
-[Merge em main] → Squash merge
-    ↓
-[deploy-production.yml] → Build Docker + Push GHCR + Deploy SSH
-```
-
-**Branches protegidas:**
-
-| Branch  | Regras                   | Merge strategy |
-| ------- | ------------------------ | -------------- |
-| develop | Requer CI (validate-pr)  | Squash merge   |
-| homolog | Requer CI + Docker build | Squash merge   |
-| main    | Requer CI + 1 reviewer   | Squash merge   |
-
-**Hotfix:**
-
-Para correções de emergência em produção, crie uma branch `hotfix/xxx` que segue o caminho direto:
-
-```
-hotfix/xxx
-    ↓
-[auto-pr.yml] → cria PR para main (com label 'hotfix')
-    ↓
-[validate-pr.yml] → CI completo
-    ↓
-[Merge em main] → Deploy automático
-    ↓
-[promote.yml] → backport automático para develop
-```
-
-Detalhes completos em [docs/gitflow.md](docs/gitflow.md).
-
----
-
-## Desenvolvimento com Husky
-
-O código é formatado **automaticamente** antes de cada commit usando **Husky** + **lint-staged**.
-
-**Ao fazer `git commit`:**
-
-```
-git commit -m "meu mensagem"
-    ↓
-🎯 Husky intercepta (pre-commit hook)
-    ↓
-lint-staged executa:
-├─ prettier --write (formata)
-└─ eslint --fix (corrige linting)
-    ↓
-Arquivos formatados automaticamente
-    ↓
-Commit prossegue ✅
-```
-
-**O que isso significa:**
-
-✅ Você **nunca** precisa rodar `npm run format` manualmente  
-✅ Arquivo sem formatação? Husky formata automaticamente  
-✅ CI/CD **nunca** falha por Prettier check  
-✅ Código sempre consistente
-
-**Se o Husky estiver desabilitado por acaso:**
-
-```bash
-npx husky install   # reinstala hooks
-```
-
-Detalhes em [docs/development.md](docs/development.md).
-
----
-
 ## Deploy
 
 O deploy em produção é **automático** a cada merge na branch `main`.
 
 **Pipeline de CI/CD:**
 
-```
-git push origin main
-    ↓
-[deploy-production.yml] dispara automaticamente
-    ↓
-1. CI (lint, typecheck, build, test)
-    ↓
-2. Build Docker multi-arch (linux/amd64 + linux/arm64)
-    ↓
-3. Push para GitHub Container Registry (ghcr.io)
-    ↓
-4. Deploy SSH para Oracle VM
-   ├─ rsync de arquivos de infraestrutura
-   ├─ docker compose pull da nova imagem
-   ├─ restart dos containers
-   └─ health check validando container
-```
+A imagem é multi-stage (build + runtime enxuto, usuário não-root, `HEALTHCHECK` nativo). O Caddy
+cuida do HTTPS automático. Em produção, `WHATSAPP_PROVIDER=meta` é forçado automaticamente pelo
+`docker-compose.prod.yml`.
 
 **Secrets necessários (GitHub Environment: `production`):**
 
@@ -403,8 +294,5 @@ Detalhes técnicos e troubleshooting em [docs/ci-cd.md](docs/ci-cd.md).
 
 ## Documentação adicional
 
-- [docs/gitflow.md](docs/gitflow.md) — GitFlow completo: convenção de branches, fluxo de promoção, regras de proteção
-- [docs/development.md](docs/development.md) — Desenvolvimento local com Husky, Git hooks, boas práticas
-- [docs/ci-cd.md](docs/ci-cd.md) — Workflows de CI/CD: auto-pr, validate-pr, promote, deploy automático
 - [docs/webhook-setup.md](docs/webhook-setup.md) — configuração do webhook (uazapi para dev, Meta para prod)
 - [docs/docker-setup.md](docs/docker-setup.md) — Docker / PostgreSQL / troubleshooting

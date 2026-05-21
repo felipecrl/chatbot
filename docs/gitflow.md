@@ -14,6 +14,42 @@ Cada ambiente possui regras de proteção, CI/CD obrigatório, e estratégia de 
 
 ---
 
+## ⚠️ Regra Crítica: Nunca faça push direto para main/homolog/develop
+
+**NUNCA execute:**
+
+```bash
+# ❌ ERRADO - vai quebrar o GitFlow
+git push origin HEAD:main
+git push origin HEAD:homolog
+git push origin HEAD:develop
+git push origin feature/xxx --force
+```
+
+**SEMPRE use PRs:**
+
+```bash
+# ✅ CORRETO - use PRs
+git push origin feature/xxx
+# ... GitHub Actions cria PR automaticamente via auto-pr.yml
+# ... Você faz merge com Squash merge via GitHub
+```
+
+**Por que?**
+
+- `main`, `homolog`, e `develop` têm branch protection rules
+- Só PRs com CI aprovado podem fazer merge (squash merge apenas)
+- Se você tentar push direto, vai ser **rejeitado** (ou requer bypass via --force, que está bloqueado)
+- Se conseguir fazer bypass (força do admin), quebra a sincronização entre branches e causa **conflitos recorrentes**
+
+Se acidentalmente fez push direto (ou force push):
+
+1. **Revert**: Crie um PR com `git revert <commit>` para desfazer
+2. Abra uma issue mencionando quais commits invadiram a branch protegida
+3. Sincronize as branches via merge PR se necessário
+
+---
+
 ## Convenção de branches
 
 ### Branches de trabalho
@@ -277,6 +313,46 @@ git push origin feature/xxx
 - Rode localmente: `npm run lint && npm run build && npm test`
 - Certifique-se de que os arquivos foram formatados (Husky deve ter feito isso no commit)
 - Se o problema persistir, verifique os logs do GitHub Actions
+
+### "As branches main/homolog estão desincronizadas com conflitos recorrentes"
+
+**Sintoma:** Toda vez que cria uma PR de promoção (develop → homolog ou homolog → main), aparece "merge conflicts" mesmo sem mudanças recentes.
+
+**Causa raiz:** Alguém fez push direto para `main` ou `homolog` (ou force push), quebrando a sequência GitFlow.
+
+**Exemplo de o que aconteceu:**
+
+```
+develop ──→ (PR #1) ──→ homolog ──→ (PR #2) ──→ main
+                                         ↑
+                    Alguém fez push direto aqui (ou force push)
+                    quebrando a sincronização
+```
+
+**Solução:**
+
+1. Crie um branch de merge a partir de origin/main:
+
+   ```bash
+   git checkout -B merge-XXX origin/main
+   ```
+
+2. Merge a branch "correta" (com as melhorias) usando estratégia `-X theirs`:
+
+   ```bash
+   git merge -X theirs origin/homolog -m "chore: sync branches"
+   ```
+
+3. Push e crie PR:
+
+   ```bash
+   git push -u origin merge-XXX
+   gh pr create --title "Fix branch sync" --body "..."
+   ```
+
+4. Após merge dessa PR, as branches estarão sincronizadas novamente.
+
+5. **PREVENÇÃO:** Certifique-se de que `enforce_admins: true` está ativado no branch protection (setup-branch-protection.sh o faz automaticamente).
 
 ### "Quero abortar / deletar a branch"
 
