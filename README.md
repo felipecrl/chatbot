@@ -334,15 +334,5 @@ Detalhes técnicos e troubleshooting em [docs/ci-cd.md](docs/ci-cd.md).
 
 ## Documentação adicional
 
-**Começar:**
-
-- [docs/quick-start.md](docs/quick-start.md) — ⚡ Começar em 5 minutos
-- [docs/commands.md](docs/commands.md) — 📋 Referência completa de comandos `make` e `npm`
-
-**Guias detalhados:**
-
-- [docs/development.md](docs/development.md) — Fluxo de trabalho, Husky, Git hooks, boas práticas
-- [docs/docker-setup.md](docs/docker-setup.md) — Docker Compose, PostgreSQL, troubleshooting
-- [docs/gitflow.md](docs/gitflow.md) — GitFlow workflow, branch protection, deploy automático
-- [docs/ci-cd.md](docs/ci-cd.md) — Workflows de GitHub Actions, testes de cobertura, rollback
-- [docs/webhook-setup.md](docs/webhook-setup.md) — Configuração de webhook (uazapi para dev, Meta para prod)
+- [docs/webhook-setup.md](docs/webhook-setup.md) — configuração do webhook (uazapi para dev, Meta para prod)
+- [docs/docker-setup.md](docs/docker-setup.md) — Docker / PostgreSQL / troubleshooting
