@@ -2,7 +2,14 @@ import OpenAI from 'openai';
 import { config } from '../../config';
 import { logger } from '../../lib/logger';
 import { toErrorMeta } from '../../lib/errors';
-import type { AiService, ChatRequest, ChatResult, ChatTool, TokenUsage } from './ai.types';
+import type {
+  AiService,
+  ChatMessage,
+  ChatRequest,
+  ChatResult,
+  ChatTool,
+  TokenUsage,
+} from './ai.types';
 
 const log = logger.child({ module: 'ai.openai' });
 
@@ -12,9 +19,15 @@ const TEMPERATURE = 0.7;
 
 const CLASSIFIER_MODEL = 'gpt-4o-mini';
 const CLASSIFIER_SYSTEM = `Você é um classificador de mensagens para um chatbot de imobiliária.
-Determine se a mensagem é relacionada ao mercado imobiliário.
-Tópicos permitidos: busca de imóveis, preços, aluguel, compra, venda, visitas, financiamento, bairros, condomínios, características de imóveis, saudações e despedidas.
-Responda APENAS com "sim" (dentro do escopo) ou "nao" (fora do escopo).`;
+Determine se a mensagem do cliente é relacionada ao mercado imobiliário, levando em conta o contexto da conversa fornecida.
+
+Tópicos ON-TOPIC (responda "sim"): busca de imóveis em qualquer cidade ou bairro do Brasil, preços, aluguel, compra, venda, visitas, financiamento, condomínios, características de imóveis (quartos, área, garagem, etc.), localização, disponibilidade, saudações e despedidas.
+Exemplos ON-TOPIC: "tem apartamento em São Paulo?", "qual o preço?", "quero alugar em Campinas", "vocês têm casas no Rio?", "imóvel de 3 quartos", "quanto fica o condomínio?".
+
+Respostas curtas ou ambíguas (ex: "não tenho preferências", "tanto faz", "qualquer um", "pode ser", "não sei", "tudo bem") DEVEM ser classificadas como "sim" quando a conversa anterior é sobre imóveis.
+
+Tópicos OFF-TOPIC (responda "nao"): culinária, política, ciência, história, entretenimento, notícias e qualquer assunto completamente alheio ao mercado imobiliário.
+Responda APENAS com "sim" ou "nao".`;
 
 export interface OpenAiServiceOptions {
   client?: OpenAI;
@@ -85,13 +98,20 @@ export class OpenAiService implements AiService {
     return { text: response.choices[0]?.message.content ?? null, usage: toUsage(response.usage) };
   }
 
-  async classify(text: string): Promise<boolean> {
+  async classify(text: string, context?: ChatMessage[]): Promise<boolean> {
     try {
+      const contextPart =
+        context && context.length > 0
+          ? `Contexto da conversa:\n${context
+              .map((m) => `${m.role === 'user' ? 'Cliente' : 'Assistente'}: ${m.content}`)
+              .join('\n')}\n\nMensagem atual do cliente: `
+          : '';
+
       const response = await this.client.chat.completions.create({
         model: CLASSIFIER_MODEL,
         messages: [
           { role: 'system', content: CLASSIFIER_SYSTEM },
-          { role: 'user', content: text },
+          { role: 'user', content: `${contextPart}${text}` },
         ],
         max_tokens: 5,
         temperature: 0,

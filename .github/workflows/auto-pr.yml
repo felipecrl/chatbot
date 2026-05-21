@@ -1,0 +1,90 @@
+name: Auto PR
+
+on:
+  push:
+    branches:
+      - 'feature/**'
+      - 'fix/**'
+      - 'hotfix/**'
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  create-pr:
+    name: Criar PR automático
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Determinar branch base
+        id: config
+        run: |
+          BRANCH="${{ github.ref_name }}"
+          if [[ "$BRANCH" == hotfix/* ]]; then
+            echo "base=main"       >> "$GITHUB_OUTPUT"
+            echo "is_hotfix=true"  >> "$GITHUB_OUTPUT"
+          else
+            echo "base=develop"    >> "$GITHUB_OUTPUT"
+            echo "is_hotfix=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Garantir labels necessárias
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          gh label create "hotfix"   --color "e11d48" --description "Hotfix urgente - caminho direto para producao" --force 2>/dev/null || true
+          gh label create "backport" --color "7c3aed" --description "Backport automatico de hotfix"                 --force 2>/dev/null || true
+
+      - name: Criar PR (se não existir)
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          BASE="${{ steps.config.outputs.base }}"
+          BRANCH="${{ github.ref_name }}"
+          ACTOR="${{ github.actor }}"
+
+          EXISTING=$(gh pr list --base "$BASE" --head "$BRANCH" --json number --jq '.[0].number' 2>/dev/null || echo "")
+          if [ -n "$EXISTING" ]; then
+            echo "PR #$EXISTING ja existe para $BASE — nenhuma acao necessaria"
+            exit 0
+          fi
+
+          if [ "${{ steps.config.outputs.is_hotfix }}" = "true" ]; then
+            TITLE="hotfix: ${BRANCH#hotfix/}"
+            {
+              echo "## HOTFIX — Caminho direto para \`main\`"
+              echo ""
+              echo "ATENCAO: Este PR vai diretamente para producao."
+              echo "Apos o merge, um PR de backport sera criado automaticamente para \`develop\`."
+              echo ""
+              echo "**Branch:** \`${BRANCH}\`"
+              echo "**Autor:** @${ACTOR}"
+            } > /tmp/pr-body.md
+            gh pr create \
+              --base "$BASE" \
+              --head "$BRANCH" \
+              --title "$TITLE" \
+              --body-file /tmp/pr-body.md \
+              --label "hotfix"
+          else
+            TITLE="[${BRANCH}] -> develop"
+            {
+              echo "## PR Automatico"
+              echo ""
+              echo "**Branch:** \`${BRANCH}\`"
+              echo "**Autor:** @${ACTOR}"
+              echo ""
+              echo "### Checklist"
+              echo "- [ ] Codigo revisado"
+              echo "- [ ] Testes adicionados/atualizados"
+              echo "- [ ] Sem breaking changes nao documentados"
+            } > /tmp/pr-body.md
+            gh pr create \
+              --base "$BASE" \
+              --head "$BRANCH" \
+              --title "$TITLE" \
+              --body-file /tmp/pr-body.md
+          fi

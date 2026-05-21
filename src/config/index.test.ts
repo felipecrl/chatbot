@@ -39,20 +39,19 @@ describe('config', () => {
     expect(config.logging.level).toBe('warn');
   });
 
-  it('flags integrations as enabled only when fully configured', async () => {
+  it('flags imoview as enabled only when fully configured', async () => {
     const config = await loadConfigWith({
-      SR_PROPRIETARIO_API_URL: 'https://sr.example.com',
-      SR_PROPRIETARIO_API_KEY: 'k',
-      IMOVIEW_API_URL: 'https://crm.example.com',
+      IMOVIEW_API_URL: 'https://api.imoview.com.br',
       IMOVIEW_API_KEY: 'k',
     });
-    expect(config.srProprietario.enabled).toBe(true);
     expect(config.imoview.enabled).toBe(true);
   });
 
-  it('flags integrations as disabled when partially configured', async () => {
-    const config = await loadConfigWith({ SR_PROPRIETARIO_API_URL: 'https://sr.example.com' });
-    expect(config.srProprietario.enabled).toBe(false);
+  it('flags imoview as disabled when partially configured', async () => {
+    const config = await loadConfigWith({
+      IMOVIEW_API_URL: 'https://api.imoview.com.br',
+      IMOVIEW_API_KEY: '',
+    });
     expect(config.imoview.enabled).toBe(false);
   });
 });

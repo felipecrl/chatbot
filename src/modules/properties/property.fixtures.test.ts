@@ -38,6 +38,25 @@ describe('searchSampleProperties', () => {
   it('respects the limit', () => {
     expect(searchSampleProperties({}, 2)).toHaveLength(2);
   });
+
+  it('returns empty when city does not match any sample property', () => {
+    expect(searchSampleProperties({ city: 'São Paulo' }, 10)).toHaveLength(0);
+  });
+
+  it('filters by city (case-insensitive, accent-insensitive)', () => {
+    const results = searchSampleProperties({ city: 'belo horizonte' }, 10);
+    expect(results.length).toBeGreaterThan(0);
+    expect(results.every((p) => p.city?.toLowerCase().includes('belo horizonte'))).toBe(true);
+  });
+
+  it('filters by neighborhood (case-insensitive)', () => {
+    const results = searchSampleProperties({ neighborhood: 'savassi' }, 10);
+    expect(results.map((p) => p.code)).toEqual(['AP001']);
+  });
+
+  it('returns empty when neighborhood does not match', () => {
+    expect(searchSampleProperties({ neighborhood: 'Vila Madalena' }, 10)).toHaveLength(0);
+  });
 });
 
 describe('findSampleProperty', () => {

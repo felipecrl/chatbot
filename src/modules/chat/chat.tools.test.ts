@@ -52,35 +52,117 @@ describe('parseBrazilianDateTime', () => {
   });
 });
 
+const sampleProperty = (code = 'AP001', neighborhood = 'Savassi'): Property => ({
+  code,
+  type: 'Apartamento',
+  transaction: 'venda',
+  city: 'São Paulo',
+  neighborhood,
+  address: null,
+  price: 450_000,
+  area: 75,
+  bedrooms: 2,
+  bathrooms: 2,
+  parkingSpaces: 1,
+  amenities: [],
+  description: '',
+  photos: [],
+});
+
 describe('buscar_imoveis tool', () => {
-  it('returns a message when nothing matches', async () => {
+  it('returns semResultado when nothing matches', async () => {
     const deps = makeDeps();
     const result = (await toolByName(deps, 'buscar_imoveis').handler({
       modalidade: 'venda',
+      cidade: 'Manaus',
     })) as Record<string, unknown>;
     expect(result.imoveis).toEqual([]);
-    expect(result.mensagem).toMatch(/Nenhum imóvel/);
+    expect(result.semResultado).toBe(true);
+  });
+
+  it('relaxes characteristic filters (sugestaoSimilar) when location-exact search is empty', async () => {
+    // First call (with characteristics) returns []; second call (location only) returns a property
+    const searchMock = vi
+      .fn()
+      .mockResolvedValueOnce([]) // full search
+      .mockResolvedValueOnce([sampleProperty()]); // location-only fallback
+    const deps = makeDeps({
+      properties: { search: searchMock, getByCode: vi.fn() },
+    });
+    const result = (await toolByName(deps, 'buscar_imoveis').handler({
+      cidade: 'São Paulo',
+      bairro: 'Vila Madalena',
+      quartos_min: 4,
+      preco_max: 200_000,
+    })) as Record<string, unknown>;
+    expect(result.sugestaoSimilar).toBe(true);
+    expect((result.imoveis as unknown[]).length).toBe(1);
+    expect(searchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('falls back to city search without characteristics (semResultadoNoBairro + sugestaoSimilar)', async () => {
+    // 1st: full search empty, 2nd: location-only in neighborhood empty, 3rd: city-only returns property
+    const searchMock = vi
+      .fn()
+      .mockResolvedValueOnce([]) // full search
+      .mockResolvedValueOnce([]) // location-only in neighborhood
+      .mockResolvedValueOnce([sampleProperty()]); // city-only fallback
+    const deps = makeDeps({
+      properties: { search: searchMock, getByCode: vi.fn() },
+    });
+    const result = (await toolByName(deps, 'buscar_imoveis').handler({
+      cidade: 'São Paulo',
+      bairro: 'Brooklin',
+      quartos_min: 5,
+    })) as Record<string, unknown>;
+    expect(result.semResultadoNoBairro).toBe(true);
+    expect(result.sugestaoSimilar).toBe(true);
+    expect(result.bairro).toBe('Brooklin');
+    expect(result.cidade).toBe('São Paulo');
+    expect((result.imoveis as unknown[]).length).toBe(1);
+    expect(searchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('falls back to city search when neighborhood has no results and returns semResultadoNoBairro', async () => {
+    // No characteristics — 1st: neighborhood empty, 2nd: city-only returns property
+    const searchMock = vi
+      .fn()
+      .mockResolvedValueOnce([]) // neighborhood search
+      .mockResolvedValueOnce([sampleProperty()]); // city-only fallback
+    const deps = makeDeps({
+      properties: { search: searchMock, getByCode: vi.fn() },
+    });
+    const result = (await toolByName(deps, 'buscar_imoveis').handler({
+      cidade: 'São Paulo',
+      bairro: 'Brooklin',
+    })) as Record<string, unknown>;
+    expect(result.semResultadoNoBairro).toBe(true);
+    expect(result.sugestaoSimilar).toBe(false);
+    expect(result.bairro).toBe('Brooklin');
+    expect(result.cidade).toBe('São Paulo');
+    expect((result.imoveis as unknown[]).length).toBe(1);
+    expect(searchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns semResultado when all fallback searches are empty', async () => {
+    const searchMock = vi.fn().mockResolvedValue([]);
+    const deps = makeDeps({
+      properties: { search: searchMock, getByCode: vi.fn() },
+    });
+    const result = (await toolByName(deps, 'buscar_imoveis').handler({
+      cidade: 'São Paulo',
+      bairro: 'Brooklin',
+      quartos_min: 5,
+    })) as Record<string, unknown>;
+    expect(result.semResultado).toBe(true);
+    expect(result.imoveis).toEqual([]);
+    // 3 attempts: full + location-only + city-only
+    expect(searchMock).toHaveBeenCalledTimes(3);
   });
 
   it('records viewed properties and returns digests', async () => {
-    const property: Property = {
-      code: 'AP001',
-      type: 'Apartamento',
-      transaction: 'venda',
-      city: 'BH',
-      neighborhood: 'Savassi',
-      address: null,
-      price: 450_000,
-      area: 75,
-      bedrooms: 2,
-      bathrooms: 2,
-      parkingSpaces: 1,
-      amenities: [],
-      description: '',
-      photos: [],
-    };
     const deps = makeDeps({
-      properties: { search: vi.fn().mockResolvedValue([property]), getByCode: vi.fn() },
+      properties: { search: vi.fn().mockResolvedValue([sampleProperty()]), getByCode: vi.fn() },
     });
     const result = (await toolByName(deps, 'buscar_imoveis').handler({})) as Record<
       string,
@@ -115,24 +197,8 @@ describe('buscar_imoveis tool', () => {
   });
 
   it('dispatches property media without failing when sending throws', async () => {
-    const property: Property = {
-      code: 'AP001',
-      type: 'Apartamento',
-      transaction: 'venda',
-      city: 'BH',
-      neighborhood: 'Savassi',
-      address: null,
-      price: 1,
-      area: 1,
-      bedrooms: 1,
-      bathrooms: 1,
-      parkingSpaces: 1,
-      amenities: [],
-      description: '',
-      photos: [],
-    };
     const deps = makeDeps({
-      properties: { search: vi.fn().mockResolvedValue([property]), getByCode: vi.fn() },
+      properties: { search: vi.fn().mockResolvedValue([sampleProperty()]), getByCode: vi.fn() },
       whatsapp: { sendProperties: vi.fn().mockRejectedValue(new Error('whatsapp down')) },
     });
     const result = (await toolByName(deps, 'buscar_imoveis').handler({})) as Record<

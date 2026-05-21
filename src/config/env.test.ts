@@ -63,6 +63,33 @@ describe('envSchema', () => {
       expect(result.error.issues.some((i) => i.path.includes('OPENAI_API_KEY'))).toBe(true);
     }
   });
+
+  it('starts without WhatsApp credentials when SKIP_WHATSAPP_SEND=true', () => {
+    const result = envSchema.safeParse({
+      DATABASE_URL: 'postgresql://user:pass@localhost:5432/db',
+      SKIP_WHATSAPP_SEND: 'true',
+      USE_MOCK_AI: 'true',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.WHATSAPP_ACCESS_TOKEN).toBe('');
+      expect(result.data.WHATSAPP_VERIFY_TOKEN).toBe('local-dev');
+    }
+  });
+
+  it('requires WhatsApp credentials when SKIP_WHATSAPP_SEND is false', () => {
+    const result = envSchema.safeParse({
+      DATABASE_URL: 'postgresql://user:pass@localhost:5432/db',
+      SKIP_WHATSAPP_SEND: 'false',
+      USE_MOCK_AI: 'true',
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const paths = result.error.issues.flatMap((i) => i.path);
+      expect(paths).toContain('WHATSAPP_ACCESS_TOKEN');
+      expect(paths).toContain('WHATSAPP_PHONE_NUMBER_ID');
+    }
+  });
 });
 
 describe('loadEnv', () => {

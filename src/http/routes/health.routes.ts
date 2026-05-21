@@ -18,7 +18,6 @@ export function healthRoutes(): Router {
           database: databaseOk ? 'ok' : 'error',
           whatsapp: 'configured',
           openai: config.openai.useMock ? 'mock' : 'configured',
-          srProprietario: config.srProprietario.enabled ? 'configured' : 'not_configured',
           imoview: config.imoview.enabled ? 'configured' : 'not_configured',
         },
       });

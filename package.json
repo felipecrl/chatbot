@@ -1,7 +1,7 @@
 {
   "name": "whatsapp-chatbot-imobiliaria",
   "version": "1.0.0",
-  "description": "Chatbot de WhatsApp com IA para imobiliárias — GPT-4 + SR Proprietário + IMOVIEW CRM + Meta Cloud API",
+  "description": "Chatbot de WhatsApp com IA para imobiliárias — GPT-4 + IMOVIEW (catálogo + CRM) + Meta Cloud API",
   "engines": {
     "node": ">=20"
   },
