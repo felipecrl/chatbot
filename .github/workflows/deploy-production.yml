@@ -30,16 +30,13 @@ jobs:
       image: ${{ steps.image.outputs.name }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Calcular nome da imagem (lowercase)
         id: image
         run: |
           NAME=$(echo "ghcr.io/${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
           echo "name=${NAME}" >> "$GITHUB_OUTPUT"
-
-      - name: Configurar QEMU (cross-compile multi-arch)
-        uses: docker/setup-qemu-action@v4
 
       - name: Configurar Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -55,7 +52,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           push: true
           tags: |
             ${{ steps.image.outputs.name }}:latest
@@ -71,7 +68,7 @@ jobs:
     environment: production
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Configurar SSH
         run: |
