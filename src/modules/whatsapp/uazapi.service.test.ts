@@ -156,10 +156,7 @@ describe('UzapiWhatsAppService', () => {
     it('uses the first photo if available', async () => {
       const propertyWithMultiplePhotos = {
         ...mockProperty,
-        photos: [
-          'https://example.com/photo1.jpg',
-          'https://example.com/photo2.jpg',
-        ],
+        photos: ['https://example.com/photo1.jpg', 'https://example.com/photo2.jpg'],
       };
 
       await service.sendProperty('5531999999999', propertyWithMultiplePhotos);
@@ -175,10 +172,7 @@ describe('UzapiWhatsAppService', () => {
     });
 
     it('sends multiple properties with delay between each', async () => {
-      const properties = [
-        mockProperty,
-        { ...mockProperty, code: 'AP002' },
-      ];
+      const properties = [mockProperty, { ...mockProperty, code: 'AP002' }];
 
       const sendPromise = service.sendProperties('5531999999999', properties);
       await vi.advanceTimersByTimeAsync(2000);
