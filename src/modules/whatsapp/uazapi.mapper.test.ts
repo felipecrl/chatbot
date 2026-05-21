@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { UzapiWebhookPayload } from './uazapi.mapper';
 import { isUzapiMessageEvent, extractIncomingMessageFromUzapi } from './uazapi.mapper';
 
-function createPayload(overrides: Partial<UzapiWebhookPayload> = {}): UzapiWebhookPayload {
+function createPayload(messageOverrides: Record<string, unknown> = {}): UzapiWebhookPayload {
   return {
     EventType: 'messages',
     instanceName: 'test-instance',
@@ -19,8 +19,8 @@ function createPayload(overrides: Partial<UzapiWebhookPayload> = {}): UzapiWebho
       type: 'text',
       messageTimestamp: 1700000000,
       senderName: 'João',
+      ...messageOverrides,
     },
-    ...overrides,
   };
 }
 
@@ -31,13 +31,13 @@ describe('isUzapiMessageEvent', () => {
   });
 
   it('returns false for other event types', () => {
-    expect(isUzapiMessageEvent({ EventType: 'connection' })).toBe(false);
-    expect(isUzapiMessageEvent({ EventType: 'ack' })).toBe(false);
-    expect(isUzapiMessageEvent({})).toBe(false);
+    expect(isUzapiMessageEvent({ EventType: 'connection' } as UzapiWebhookPayload)).toBe(false);
+    expect(isUzapiMessageEvent({ EventType: 'ack' } as UzapiWebhookPayload)).toBe(false);
+    expect(isUzapiMessageEvent({} as UzapiWebhookPayload)).toBe(false);
   });
 
   it('returns false for undefined EventType', () => {
-    expect(isUzapiMessageEvent({ message: { messageid: '123' } })).toBe(false);
+    expect(isUzapiMessageEvent({ message: { messageid: '123' } } as UzapiWebhookPayload)).toBe(false);
   });
 });
 
@@ -56,7 +56,8 @@ describe('extractIncomingMessageFromUzapi', () => {
 
   it('strips @s.whatsapp.net suffix from sender_pn', () => {
     const payload = createPayload({
-      message: { messageid: 'msg-1', chatid: '5531999999999@s.whatsapp.net', sender_pn: '5531999999999@s.whatsapp.net' },
+      sender_pn: '5531999999999@s.whatsapp.net',
+      chatid: '5531999999999@s.whatsapp.net',
     });
     const msg = extractIncomingMessageFromUzapi(payload);
     expect(msg?.from).toBe('5531999999999');
@@ -64,7 +65,8 @@ describe('extractIncomingMessageFromUzapi', () => {
 
   it('strips @c.us suffix from sender_pn', () => {
     const payload = createPayload({
-      message: { messageid: 'msg-1', chatid: '5531999999999@c.us', sender_pn: '5531999999999@c.us' },
+      sender_pn: '5531999999999@c.us',
+      chatid: '5531999999999@c.us',
     });
     const msg = extractIncomingMessageFromUzapi(payload);
     expect(msg?.from).toBe('5531999999999');
@@ -72,37 +74,48 @@ describe('extractIncomingMessageFromUzapi', () => {
 
   it('returns null when messageid is missing', () => {
     const payload = createPayload({
-      message: { messageid: undefined, sender_pn: '5531999999999@s.whatsapp.net' },
+      messageid: undefined,
+      sender_pn: '5531999999999@s.whatsapp.net',
     });
     expect(extractIncomingMessageFromUzapi(payload)).toBeNull();
   });
 
   it('returns null when message is from the user (fromMe=true)', () => {
-    const payload = createPayload({ message: { messageid: 'msg-1', fromMe: true } });
+    const payload = createPayload({
+      messageid: 'msg-1',
+      fromMe: true,
+    });
     expect(extractIncomingMessageFromUzapi(payload)).toBeNull();
   });
 
   it('returns null when message is from a group', () => {
-    const payload = createPayload({ message: { messageid: 'msg-1', isGroup: true } });
+    const payload = createPayload({
+      messageid: 'msg-1',
+      isGroup: true,
+    });
     expect(extractIncomingMessageFromUzapi(payload)).toBeNull();
   });
 
   it('returns null when chat is a group (via chat.wa_isGroup)', () => {
     const payload = createPayload({
-      message: { messageid: 'msg-1', isGroup: false },
-      chat: { wa_isGroup: true },
+      messageid: 'msg-1',
+      isGroup: false,
     });
+    payload.chat = { wa_isGroup: true };
     expect(extractIncomingMessageFromUzapi(payload)).toBeNull();
   });
 
   it('returns null when message was sent by API', () => {
-    const payload = createPayload({ message: { messageid: 'msg-1', wasSentByApi: true } });
+    const payload = createPayload({
+      messageid: 'msg-1',
+      wasSentByApi: true,
+    });
     expect(extractIncomingMessageFromUzapi(payload)).toBeNull();
   });
 
-  it('uses text field when content is missing', () => {
+  it('uses text field when available', () => {
     const payload = createPayload({
-      message: { messageid: 'msg-1', text: 'Via text', content: undefined },
+      text: 'Via text',
     });
     const msg = extractIncomingMessageFromUzapi(payload);
     expect(msg?.text).toBe('Via text');
@@ -110,15 +123,27 @@ describe('extractIncomingMessageFromUzapi', () => {
 
   it('falls back to content field when text is missing', () => {
     const payload = createPayload({
-      message: { messageid: 'msg-1', text: undefined, content: 'Via content' },
+      text: undefined,
+      content: 'Via content',
     });
     const msg = extractIncomingMessageFromUzapi(payload);
     expect(msg?.text).toBe('Via content');
   });
 
+  it('defaults text to empty string when both text and content are missing', () => {
+    const payload = createPayload({
+      text: undefined,
+      content: undefined,
+    });
+    const msg = extractIncomingMessageFromUzapi(payload);
+    expect(msg?.text).toBe('');
+  });
+
   it('prefers sender_pn over chatid for extracting the from field', () => {
     const payload = createPayload({
-      message: { messageid: 'msg-1', sender_pn: '5531111111111@s.whatsapp.net', chatid: '5531999999999@s.whatsapp.net' },
+      messageid: 'msg-1',
+      sender_pn: '5531111111111@s.whatsapp.net',
+      chatid: '5531999999999@s.whatsapp.net',
     });
     const msg = extractIncomingMessageFromUzapi(payload);
     expect(msg?.from).toBe('5531111111111');
@@ -126,7 +151,9 @@ describe('extractIncomingMessageFromUzapi', () => {
 
   it('falls back to chatid when sender_pn is missing', () => {
     const payload = createPayload({
-      message: { messageid: 'msg-1', sender_pn: undefined, chatid: '5531999999999@s.whatsapp.net' },
+      messageid: 'msg-1',
+      sender_pn: undefined,
+      chatid: '5531999999999@s.whatsapp.net',
     });
     const msg = extractIncomingMessageFromUzapi(payload);
     expect(msg?.from).toBe('5531999999999');
@@ -134,14 +161,17 @@ describe('extractIncomingMessageFromUzapi', () => {
 
   it('returns null when neither sender_pn nor chatid is provided', () => {
     const payload = createPayload({
-      message: { messageid: 'msg-1', sender_pn: undefined, chatid: undefined },
+      messageid: 'msg-1',
+      sender_pn: undefined,
+      chatid: undefined,
     });
     expect(extractIncomingMessageFromUzapi(payload)).toBeNull();
   });
 
   it('defaults contactName to empty string when senderName is missing', () => {
     const payload = createPayload({
-      message: { messageid: 'msg-1', senderName: undefined },
+      messageid: 'msg-1',
+      senderName: undefined,
     });
     const msg = extractIncomingMessageFromUzapi(payload);
     expect(msg?.contactName).toBe('');
@@ -149,7 +179,8 @@ describe('extractIncomingMessageFromUzapi', () => {
 
   it('uses current timestamp when messageTimestamp is missing', () => {
     const payload = createPayload({
-      message: { messageid: 'msg-1', messageTimestamp: undefined },
+      messageid: 'msg-1',
+      messageTimestamp: undefined,
     });
     const msg = extractIncomingMessageFromUzapi(payload);
     expect(msg?.timestamp).toBeDefined();
