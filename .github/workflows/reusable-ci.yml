@@ -14,15 +14,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
       - name: Instalar dependências
         run: npm ci
+
+      - name: Audit de dependências
+        run: npm audit --audit-level=high
 
       - name: Lint
         run: npm run lint
@@ -36,8 +39,16 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Testes
-        run: npm test
+      - name: Testes com coverage
+        run: npm run test:coverage
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 30
 
   docker-build:
     name: Docker Build Test
@@ -46,7 +57,7 @@ jobs:
     if: inputs.docker-build == 'true'
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
       - name: Configurar Docker Buildx
         uses: docker/setup-buildx-action@v4
