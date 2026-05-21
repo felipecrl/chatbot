@@ -31,13 +31,13 @@ describe('isUzapiMessageEvent', () => {
   });
 
   it('returns false for other event types', () => {
-    expect(isUzapiMessageEvent({ EventType: 'connection' } as UzapiWebhookPayload)).toBe(false);
-    expect(isUzapiMessageEvent({ EventType: 'ack' } as UzapiWebhookPayload)).toBe(false);
-    expect(isUzapiMessageEvent({} as UzapiWebhookPayload)).toBe(false);
+    expect(isUzapiMessageEvent({ EventType: 'connection' })).toBe(false);
+    expect(isUzapiMessageEvent({ EventType: 'ack' })).toBe(false);
+    expect(isUzapiMessageEvent({})).toBe(false);
   });
 
   it('returns false for undefined EventType', () => {
-    expect(isUzapiMessageEvent({ message: { messageid: '123' } } as UzapiWebhookPayload)).toBe(false);
+    expect(isUzapiMessageEvent({ message: { messageid: '123' } })).toBe(false);
   });
 });
 
