@@ -15,18 +15,42 @@ descreve as opções e agenda visitas — registrando o lead no CRM. Integra **O
 
 ## Sumário
 
+- [⚡ Quick Start (5 minutos)](#quick-start)
 - [Arquitetura](#arquitetura)
 - [Pré-requisitos](#pré-requisitos)
 - [Configuração](#configuração)
 - [Rodando localmente](#rodando-localmente)
 - [Rodando com Docker](#rodando-com-docker)
 - [Banco de dados / migrations](#banco-de-dados--migrations)
-- [Scripts disponíveis](#scripts-disponíveis)
+- [Scripts e Comandos Disponíveis](#scripts-disponíveis)
 - [Testes, lint e build](#testes-lint-e-build)
 - [Variáveis de ambiente](#variáveis-de-ambiente)
 - [Endpoints HTTP](#endpoints-http)
+- [GitFlow e CI/CD](#gitflow-e-cicd)
 - [Deploy](#deploy)
 - [Documentação adicional](#documentação-adicional)
+
+---
+
+## ⚡ Quick Start
+
+**Em 3 comandos:**
+
+```bash
+git clone https://github.com/felipecrl/chatbot.git && cd chatbot
+npm install
+make start                    # Sobe tudo (PostgreSQL + App)
+```
+
+**Pronto!** API em `http://localhost:3000`
+
+**Para parar:**
+
+```bash
+make stop
+```
+
+> **Quer mais detalhes?** Veja [docs/quick-start.md](docs/quick-start.md) e [docs/commands.md](docs/commands.md)
 
 ---
 
@@ -164,27 +188,45 @@ npm run db:studio           # abre o Prisma Studio
 
 ---
 
-## Scripts disponíveis
+## Scripts Disponíveis
 
-Execute `make help` para listar todos os atalhos disponíveis. Principais:
+### Comandos principais (Makefile)
 
-| Makefile / npm script                 | Descrição                            |
-| ------------------------------------- | ------------------------------------ |
-| `make dev` / `npm run dev`            | Servidor em modo watch (`tsx watch`) |
-| `make dev-docker`                     | Sobe stack completo em Docker (dev)  |
-| `make dev-down`                       | Derruba containers de dev            |
-| `make dev-logs`                       | Segue os logs do app em dev          |
-| `make prod-up`                        | Sobe com overrides de produção       |
-| `make prod-down`                      | Derruba containers de prod           |
-| `make migrate` / `npm run db:migrate` | Cria e aplica migration (dev)        |
-| `make studio` / `npm run db:studio`   | Abre o Prisma Studio                 |
-| `make test` / `npm test`              | Vitest (uma vez)                     |
-| `make lint`                           | ESLint + verificação de formatação   |
-| `make build` / `npm run build`        | Compila TypeScript para `dist/`      |
-| `npm run compose:dev`                 | Alias de `make dev-docker`           |
-| `npm run compose:prod`                | Alias de `make prod-up`              |
-| `npm run test:watch`                  | Vitest em watch                      |
-| `npm run test:coverage`               | Vitest com cobertura                 |
+Execute `make help` para listar todos. Principais:
+
+| Comando             | Descrição                                                        |
+| ------------------- | ---------------------------------------------------------------- |
+| **`make start`**    | ✨ **START COMPLETO** — Sobe PostgreSQL + app + migrations       |
+| **`make stop`**     | ✨ **STOP COMPLETO** — Para todos os containers (preserva dados) |
+| `make dev`          | Servidor em modo watch (local, requer PostgreSQL)                |
+| `make dev-docker`   | Sobe PostgreSQL + app em Docker                                  |
+| `make dev-down`     | Para containers de dev                                           |
+| `make dev-logs`     | Segue logs do app                                                |
+| `make dev-build`    | Reconstrói imagem após mudanças                                  |
+| `make dev-db-shell` | Acesso psql ao banco                                             |
+| `make migrate`      | Cria/aplica migration                                            |
+| `make studio`       | Abre Prisma Studio (UI do banco)                                 |
+| `make test`         | Roda testes (uma vez)                                            |
+| `make lint`         | ESLint + Prettier check                                          |
+| `make build`        | Compila TypeScript                                               |
+
+### Scripts npm
+
+| Script                  | Descrição                            |
+| ----------------------- | ------------------------------------ |
+| `npm run dev`           | Servidor com hot-reload              |
+| `npm test`              | Testes Vitest                        |
+| `npm run test:watch`    | Testes em watch mode                 |
+| `npm run test:coverage` | Testes com cobertura (95% threshold) |
+| `npm run lint:fix`      | ESLint com correção automática       |
+| `npm run format`        | Prettier (formata tudo)              |
+| `npm run typecheck`     | Type-check TypeScript                |
+| `npm run build`         | Compila para `dist/`                 |
+| `npm run db:migrate`    | Criar/aplicar migration              |
+| `npm run db:deploy`     | Aplicar migrations (CI/prod)         |
+| `npm run db:studio`     | Prisma Studio                        |
+
+> **Referência completa:** veja [docs/commands.md](docs/commands.md)
 
 ---
 
@@ -243,19 +285,41 @@ Lista completa e comentada em [`.env.example`](.env.example). Resumo:
 
 ## Deploy
 
-O deploy em produção é feito automaticamente pelo pipeline de CI/CD
-([.github/workflows/ci.yml](.github/workflows/ci.yml)) a cada push na branch `main`:
+O deploy em produção é **automático** a cada merge na branch `main`.
 
-1. **build** — lint, type-check, build e testes
-2. **publish** — constrói imagem multi-arch (`linux/amd64` + `linux/arm64`) e publica no `ghcr.io`
-3. **deploy** — sincroniza arquivos via rsync, faz `docker compose pull` da nova imagem e reinicia
-   os containers na Oracle VM via SSH
+**Pipeline de CI/CD:**
 
 A imagem é multi-stage (build + runtime enxuto, usuário não-root, `HEALTHCHECK` nativo). O Caddy
 cuida do HTTPS automático. Em produção, `WHATSAPP_PROVIDER=meta` é forçado automaticamente pelo
 `docker-compose.prod.yml`.
 
-Para subir manualmente em produção (requer `DOCKER_IMAGE` configurado no `.env` da VM):
+**Secrets necessários (GitHub Environment: `production`):**
+
+| Secret         | Descrição                                 |
+| -------------- | ----------------------------------------- |
+| `PROD_SSH_KEY` | Chave SSH privada para acesso à Oracle VM |
+| `PROD_VM_IP`   | IP da VM                                  |
+| `PROD_VM_USER` | Usuário SSH (geralmente `ubuntu`)         |
+
+**Setup inicial:**
+
+1. Configure os secrets no GitHub:
+
+   ```
+   https://github.com/felipecrl/chatbot/settings/environments/production
+   ```
+
+2. Adicione o PAT `GH_PAT` com escopo `repo` + `read:org`:
+
+   ```
+   https://github.com/felipecrl/chatbot/settings/secrets/actions
+   ```
+
+3. A imagem é multi-stage (build + runtime enxuto, usuário não-root, `HEALTHCHECK` nativo)
+4. O Caddy cuida do HTTPS automático
+5. Em produção, `WHATSAPP_PROVIDER=meta` é forçado automaticamente pelo `docker-compose.prod.yml`
+
+**Para subir manualmente em produção** (requer `DOCKER_IMAGE` configurado no `.env` da VM):
 
 ```bash
 make prod-up
@@ -263,6 +327,8 @@ make prod-up
 
 Ajuste o domínio em [`Caddyfile`](Caddyfile) e configure o webhook na Meta apontando para
 `https://SEU_DOMINIO/webhook`.
+
+Detalhes técnicos e troubleshooting em [docs/ci-cd.md](docs/ci-cd.md).
 
 ---
 
