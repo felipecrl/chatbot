@@ -30,7 +30,7 @@ jobs:
       image: ${{ steps.image.outputs.name }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Calcular nome da imagem (lowercase)
         id: image
@@ -68,7 +68,7 @@ jobs:
     environment: production
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Configurar SSH
         run: |
