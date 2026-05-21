@@ -6,6 +6,22 @@ Tudo sobre trabalhar localmente neste projeto, incluindo Husky, hooks Git, e boa
 
 ## Setup inicial
 
+### Método recomendado (com Docker — 3 comandos)
+
+```bash
+# Clone e instale
+git clone https://github.com/felipecrl/chatbot.git
+cd chatbot
+npm install
+
+# Suba tudo de uma vez
+make start              # Sobe PostgreSQL + app + migrations automaticamente
+```
+
+Pronto! API rodando em `http://localhost:3000`. Para parar: `make stop`
+
+### Alternativa: Setup manual (local, requer PostgreSQL)
+
 ```bash
 # Clone e instale
 git clone https://github.com/felipecrl/chatbot.git
@@ -19,17 +35,15 @@ npx husky install
 cp .env.example .env
 # Edite .env com suas credenciais (UAZAPI_INSTANCE_TOKEN, etc)
 
-# Inicie o banco de dados
-npm run compose:dev
-
+# Certifique-se que PostgreSQL está rodando localmente
 # Rode as migrations
 npm run db:deploy
 
-# Inicie o servidor
+# Inicie o servidor (hot-reload)
 npm run dev
 ```
 
-Pronto! API rodando em `http://localhost:3000`.
+> **Quer mais detalhes?** Veja [docs/quick-start.md](quick-start.md)
 
 ---
 
@@ -253,15 +267,17 @@ EMPRESA_CIDADE="São Paulo"
 O projeto inclui um `docker-compose.yml` para PostgreSQL e dependências:
 
 ```bash
-# Sobe apenas o banco
-npm run compose:dev
+# Sobe PostgreSQL + app
+make dev-docker
 
 # Vê os logs
-docker compose logs -f postgres
+docker compose logs -f
 
 # Desce tudo
-npm run compose:dev:down
+make dev-down
 ```
+
+> **Dica:** Use `make start` para automação completa (setup + migrations)
 
 ---
 
