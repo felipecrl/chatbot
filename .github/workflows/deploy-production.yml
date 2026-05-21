@@ -92,6 +92,12 @@ jobs:
             -e "ssh -i ~/.ssh/deploy_key" \
             . "${{ secrets.PROD_VM_USER }}@${{ secrets.PROD_VM_IP }}:~/whatsapp-chatbot-imobiliaria/"
 
+      - name: Atualizar .env de produção
+        run: |
+          echo "${{ secrets.PROD_ENV_FILE }}" | \
+            ssh -i ~/.ssh/deploy_key "${{ secrets.PROD_VM_USER }}@${{ secrets.PROD_VM_IP }}" \
+            "cat > ~/whatsapp-chatbot-imobiliaria/.env && chmod 600 ~/whatsapp-chatbot-imobiliaria/.env"
+
       - name: Guardar imagem anterior para rollback
         env:
           IMAGE: ${{ needs.publish.outputs.image }}
